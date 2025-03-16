@@ -1,6 +1,8 @@
 #include <WiFi.h>
 #include <esp_wifi.h>
 #include <Arduino.h>
+#include <Preferences.h>
+
 #include <max6675.h>
 #include <SlowPWM.h>
 #include <EspMQTTClient.h>
@@ -50,6 +52,10 @@ EspMQTTClient *mqtt_cli = NULL;
 S_PWM *pwm = NULL;
 
 // configuration
+#define PRFS_THRM_UPD_INT_MS_FMT "thrm_upd_int_ms"
+#define PRFS_PWM_UPD_INT_MS_FMT "PWM_upd_int_ms"
+#define PRFS_MQTT_UPD_INT_MS_FMT "mqtt_upd_int_ms"
+Preferences preferences;
 #define MAX_CFG_STR 32
 #define MAC_FMT_STR "%02X%02X%02X%02X%02X%02X"  
 #define MIN_THERMO_UPDATE_MS 250
@@ -80,6 +86,10 @@ void onStateSetMessageReceived(const String &message);
 // delays according to manufacturer data sheets
 void setup() {
   uint8_t u8mac[6];
+
+  // load up the preferences so we can overwrite
+  // the config defaults
+  preferences.begin("qtkiln", false);
 
   // wait for MAX chip to stabilize
   delay(500);
@@ -113,6 +123,7 @@ void setup() {
   Serial.println(config.topic);
 
   // check some config variables against mins
+  config.thermo_update_int_ms = preferences.getUInt(PRFS_THRM_UPD_INT_MS_FMT, MIN_THERMO_UPDATE_MS);
   if (config.thermo_update_int_ms < MIN_THERMO_UPDATE_MS) {
     Serial.print("thermocouple update interval must be > ");
     Serial.print(MIN_THERMO_UPDATE_MS);
@@ -127,6 +138,7 @@ void setup() {
   }
   Serial.print("thermocouple update interval (ms) = ");
   Serial.println(config.thermo_update_int_ms);
+  config.PWM_update_int_ms = preferences.getUInt(PRFS_PWM_UPD_INT_MS_FMT, MIN_PWM_UPDATE_MS);
   if (config.PWM_update_int_ms < MIN_PWM_UPDATE_MS) {
     Serial.print("PWM update interval must be > ");
     Serial.print(MIN_PWM_UPDATE_MS);
@@ -141,6 +153,7 @@ void setup() {
   }
   Serial.print("PWM update interval (ms) = ");
   Serial.println(config.PWM_update_int_ms);
+  config.mqtt_update_int_ms = preferences.getUInt(PRFS_MQTT_UPD_INT_MS_FMT, MIN_MQTT_UPDATE_MS);
   if (config.mqtt_update_int_ms < MIN_MQTT_UPDATE_MS) {
     Serial.print("mqtt update interval must be > ");
     Serial.print(MIN_MQTT_UPDATE_MS);
