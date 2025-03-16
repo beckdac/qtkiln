@@ -81,7 +81,7 @@ void setup() {
 
 // state variables associated with the loop
 float kiln_temperature, housing_temperature;
-unsigned long last_time, now, delta_t, loop_time;
+unsigned long last_time, now, delta_t;
 
 void loop() {
   now = millis();
@@ -94,14 +94,7 @@ void loop() {
     Serial.print(kiln_temperature);
     Serial.print(" housing C = ");
     Serial.println(housing_temperature);
-
-    // how long did it take us to update the thermos
-    // and run the rest of the main loop
     now = millis();
-    loop_time = ((now-last_time)-delta_t);
-    // now delay the update interval minimum time
-    Serial.println(loop_time);
-    Serial.println(config.update_interval_ms - (now-last_time));
   }
   delay(config.update_interval_ms - (now-last_time));
 }
