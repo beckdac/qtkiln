@@ -2,6 +2,7 @@
 #include <esp_wifi.h>
 #include <Arduino.h>
 #include <max6675.h>
+#include <SlowPWM.h>
 
 // thermocouple phy
 const unsigned int MAXDO = 5;
@@ -28,10 +29,13 @@ const int mqtt_port = 1883;
 struct config {
   char mac[MAX_CFG_STR] = "c0:ff:ee:ca:fe:42";
   char topic[MAX_CFG_STR];
-  uint16_t update_interval_ms;
+  uint16_t thermo_update_int_ms;
+  uint16_t PWM_update_int_ms;
 } config;
 #define MIN_THERMO_UPDATE_MS 250
 #define MAX_THERMO_UPDATE_MS 5000
+#define MIN_PWM_UPDATE_MS 5000
+#define MAX_PWM_UPDATE_MS 20000
 
 // state variables are found above the loop function
 
@@ -72,17 +76,29 @@ void setup() {
 	topic_base, config.mac);
 
   // check some config variables against mins
-  if (config.update_interval_ms < MIN_THERMO_UPDATE_MS) {
+  if (config.thermo_update_int_ms < MIN_THERMO_UPDATE_MS) {
     Serial.print("thermocouple update interval must be > ");
     Serial.print(MIN_THERMO_UPDATE_MS);
     Serial.println(" ms ... forcing to min");
-    config.update_interval_ms = MIN_THERMO_UPDATE_MS;
+    config.thermo_update_int_ms = MIN_THERMO_UPDATE_MS;
   }
-  if (config.update_interval_ms > MAX_THERMO_UPDATE_MS) {
+  if (config.thermo_update_int_ms > MAX_THERMO_UPDATE_MS) {
     Serial.print("thermocouple update interval must be < ");
     Serial.print(MAX_THERMO_UPDATE_MS);
     Serial.println(" ms ... forcing to max");
-    config.update_interval_ms = MAX_THERMO_UPDATE_MS;
+    config.thermo_update_int_ms = MAX_THERMO_UPDATE_MS;
+  }
+  if (config.PWM_update_int_ms < MIN_PWM_UPDATE_MS) {
+    Serial.print("PWM update interval must be > ");
+    Serial.print(MIN_PWM_UPDATE_MS);
+    Serial.println(" ms ... forcing to min");
+    config.PWM_update_int_ms = MIN_PWM_UPDATE_MS;
+  }
+  if (config.PWM_update_int_ms > MAX_PWM_UPDATE_MS) {
+    Serial.print("PWM update interval must be < ");
+    Serial.print(MAX_PWM_UPDATE_MS);
+    Serial.println(" ms ... forcing to max");
+    config.PWM_update_int_ms = MAX_PWM_UPDATE_MS;
   }
 
   // do first thermocouple reading
@@ -100,7 +116,7 @@ void loop() {
   now = millis();
   delta_t = now - last_time;
   // if we have waited long enough, update the thermos
-  if (delta_t >= config.update_interval_ms) {
+  if (delta_t >= config.thermo_update_int_ms) {
     thermocouple_update();
 
     Serial.print("kiln C = "); 
@@ -112,7 +128,7 @@ void loop() {
   // delay for the remainder of an interval + at least 1 ms
   // to ensur that the next call always triggers a read
   // this reduces spurious loop() calls that have no effect
-  delay((config.update_interval_ms - (now-last_time))+1);
+  delay((config.thermo_update_int_ms - (now-last_time))+1);
 }
 
 // read the thermocouples and update hte last updated 
