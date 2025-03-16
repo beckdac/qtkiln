@@ -53,6 +53,9 @@ unsigned long pwm_last_time = 0;
 
 // PID object
 PID_v2 *pid = NULL;
+#define PID_KP 10.0
+#define PID_KI 0.2
+#define PID_KD 0.1
 
 // configuration
 #define PRFS_KI "initial_Ki"
@@ -85,9 +88,9 @@ struct config {
 void config_set_thermo_update_int_ms(uint16_t thermo_update_int_ms, bool update_prefs);
 void config_set_pwm_update_int_ms(uint16_t pwm_update_int_ms, bool update_prefs);
 void config_set_mqtt_update_int_ms(uint16_t mqtt_update_int_ms, bool update_prefs);
-void config_set_pid.Ki(double Ki, bool update_prefs);
-void config_set_pid.Kd(double Kd, bool update_prefs);
-void config_set_pid.Kp(double Kp, bool update_prefs);
+void config_set_pid_Ki(double Ki, bool update_prefs);
+void config_set_pid_Kd(double Kd, bool update_prefs);
+void config_set_pid_Kp(double Kp, bool update_prefs);
 void onConnectionEstablished(void);
 void onConfigMessageReceived(const String &message);
 void onStateSetMessageReceived(const String &message);
