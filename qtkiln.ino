@@ -146,8 +146,8 @@ void setup() {
   config_set_mqtt_update_int_ms(
      preferences.getUShort(PRFS_MQTT_UPD_INT_MS, MIN_MQTT_UPDATE_MS), false);
   config_set_pid_init_Kp(preferences.getDouble(PRFS_PID_KP, PID_KP), false);
-  config_set_pid_init_Kd(preferences.getDouble(PRFS_PID_KD, PID_KD), false);
   config_set_pid_init_Ki(preferences.getDouble(PRFS_PID_KI, PID_KI), false);
+  config_set_pid_init_Kd(preferences.getDouble(PRFS_PID_KD, PID_KD), false);
 
   // setup PWM
   pinMode(SSR_PIN, OUTPUT);
@@ -194,15 +194,30 @@ void mqtt_publish_temps(void) {
     mqtt_cli->publish(buf1, buf2);
 }
 
+bool ssr_state = off;
+void ssr_on(void) {
+  if (ssr_state)
+    return;
+  ssr_state = true;
+  digitalWrite(SSR_PIN, HIGH);
+}
+
+void ssr_off(void) {
+  if (ssr_state) {
+    ssr_state = false;
+    digitalWrite(SSR_PIN, LOW);
+  }
+}
+
 void loop() {
   now = millis();
   while (now - pwm_window_start_time > config.pwm_update_int_ms) {
 	pwm_window_start_time += config.pwm_update_int_ms;
   }
   if (pid->Run(kiln_thermo->readCelsius()) < now - pwm_window_start_time)
-    digitalWrite(SSR_PIN, HIGH);
+    ssr_on();
   else
-    digitalWrite(SSR_PIN, LOW);
+    ssr_off();
 
 
   // run handlers for subprocesses
