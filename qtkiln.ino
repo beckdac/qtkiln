@@ -19,10 +19,9 @@ const char *ssid = WIFI_SSID;
 const char *sspw = WIFI_PASS;
 
 // MQTT server
-#define MQTT_BrOKER "192.168.1.3"
 #define TOPIC_BASE "qtkiln"
 #include "mqtt_cred.h"
-EqpMQTTClient *mqtt_cli = NULL;
+EspMQTTClient *mqtt_cli = NULL;
 
 // PWM object
 #define SSR_PIN 8
@@ -78,7 +77,7 @@ void setup() {
   }
   // setup the topic based on the mac
   snprintf(config.topic, MAX_CFG_STR, "%s/%s",
-	topic_base, config.mac);
+	TOPIC_BASE, config.mac);
 
   // check some config variables against mins
   if (config.thermo_update_int_ms < MIN_THERMO_UPDATE_MS) {
@@ -112,8 +111,8 @@ void setup() {
   pwm->begin();
 
   // start the mqtt client
-  mqtt_cli = new EspMQTTClient client(WIFI_SSID, WIFI_PASS,
-    MQTT_BROKER, MQTT_USER, MQTT_PASS, config.mac, MQTT_PORT);
+  mqtt_cli = new EspMQTTClient(WIFI_SSID, WIFI_PASS, MQTT_BROKER,
+    MQTT_USER, MQTT_PASS, config.mac, MQTT_PORT);
 
   // do first thermocouple reading
   thermocouple_update();
