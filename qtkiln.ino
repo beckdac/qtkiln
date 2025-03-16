@@ -275,8 +275,10 @@ void onConfigMessageReceived(const String &message) {
     }
   }
 
-  if (config_updated)
+  if (config_updated) {
+    Serial.println("system configuration updated, restarting...");
     esp_restart();
+  }
 }
 
 // handle mqtt state messages
