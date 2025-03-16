@@ -24,13 +24,16 @@ const char *mqtt_username = "qtkiln";
 const char *mqtt_password = "hotashell";
 const int mqtt_port = 1883;
 
+// PWM object
+S_PWM *pwm = NULL;
+
 // configuration
 #define MAX_CFG_STR 24
 struct config {
   char mac[MAX_CFG_STR] = "c0:ff:ee:ca:fe:42";
   char topic[MAX_CFG_STR];
-  uint16_t thermo_update_int_ms;
-  uint16_t PWM_update_int_ms;
+  uint16_t thermo_update_int_ms = 250;
+  uint16_t PWM_update_int_ms = 5000;
 } config;
 #define MIN_THERMO_UPDATE_MS 250
 #define MAX_THERMO_UPDATE_MS 5000
@@ -101,6 +104,11 @@ void setup() {
     config.PWM_update_int_ms = MAX_PWM_UPDATE_MS;
   }
 
+  // setup PWM
+  pwm = S_PWM(SSR_PIN, config.PWM_update_int_ms);
+  pwm->setDuty(0);
+  pwm->begin();
+
   // do first thermocouple reading
   thermocouple_update();
 }
@@ -113,6 +121,8 @@ float kiln_temperature, housing_temperature;
 unsigned long last_time, now, delta_t;
 
 void loop() {
+  pwm->pwmLoop(); // run the PWM handler
+
   now = millis();
   delta_t = now - last_time;
   // if we have waited long enough, update the thermos
@@ -125,10 +135,13 @@ void loop() {
     Serial.println(housing_temperature);
     now = millis();
   }
+  delay(config.min_loop_ms);
+#if 0
   // delay for the remainder of an interval + at least 1 ms
   // to ensur that the next call always triggers a read
   // this reduces spurious loop() calls that have no effect
   delay((config.thermo_update_int_ms - (now-last_time))+1);
+#endif 
 }
 
 // read the thermocouples and update hte last updated 
