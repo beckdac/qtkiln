@@ -49,7 +49,7 @@ EspMQTTClient *mqtt_cli = NULL;
 
 // PWM object
 #define SSR_PIN 8
-unsigned long pwm_last_time = 0;
+unsigned long pwm_window_start_time = 0;
 
 // PID object
 PID_v2 *pid = NULL;
@@ -58,12 +58,12 @@ PID_v2 *pid = NULL;
 #define PID_KD 0.1
 
 // configuration
-#define PRFS_KI "initial_Ki"
-#define PRFS_KP "initial_Kp"
-#define PRFS_KD "initial_Kd"
-#define PRFS_THRM_UPD_INT_MS_FMT "thrm_upd_int_ms"
-#define PRFS_PWM_UPD_INT_MS_FMT "pwm_upd_int_ms"
-#define PRFS_MQTT_UPD_INT_MS_FMT "mqtt_upd_int_ms"
+#define PRFS_PID_KI "initial_Ki"
+#define PRFS_PID_KP "initial_Kp"
+#define PRFS_PID_KD "initial_Kd"
+#define PRFS_THRM_UPD_INT_MS "thrm_upd_int_ms"
+#define PRFS_PWM_UPD_INT_MS "pwm_upd_int_ms"
+#define PRFS_MQTT_UPD_INT_MS "mqtt_upd_int_ms"
 Preferences preferences;
 #define MAX_CFG_STR 32
 #define MAC_FMT_STR "%02X%02X%02X%02X%02X%02X"  
@@ -75,11 +75,12 @@ Preferences preferences;
 #define MAX_MQTT_UPDATE_MS 15000
 struct config {
   char mac[MAX_CFG_STR] = "c0:ff:ee:ca:fe:42";
-  char topic[MAX_CFG_STR];
+  char topic[MAX_CFG_STR] = "";
   uint16_t thermo_update_int_ms = 250;
   uint16_t pwm_update_int_ms = 5000;
   uint16_t mqtt_update_int_ms = 1000;
   uint8_t min_loop_ms = 5;
+  double Kp = 0, Ki = 0, Kd = 0;
 } config;
 
 // state variables are found above the loop function
@@ -143,15 +144,15 @@ void setup() {
      preferences.getUShort(PRFS_PWM_UPD_INT_MS, MIN_PWM_UPDATE_MS), false);
   config_set_mqtt_update_int_ms(
      preferences.getUShort(PRFS_MQTT_UPD_INT_MS, MIN_MQTT_UPDATE_MS), false);
-  config_set_init_pid_Kp(preferences.getDouble(PRFS_KP, PID_KP), false);
-  config_set_init_pid_Kd(preferences.getDouble(PRFS_KD, PID_KD), false);
-  config_set_init_pid_Ki(preferences.getDouble(PRFS_KI, PID_KI), false);
+  config_set_init_pid_Kp(preferences.getDouble(PRFS_PID_KP, PID_KP), false);
+  config_set_init_pid_Kd(preferences.getDouble(PRFS_PID_KD, PID_KD), false);
+  config_set_init_pid_Ki(preferences.getDouble(PRFS_PID_KI, PID_KI), false);
 
   // setup PWM
   pinMode(SSR_PIN, OUTPUT);
   Serial.print("PWM cycle window in ms is ");
   Serial.println(config.pwm_update_int_ms);
-  pwm_last_time = millis();
+  pwm_window_start_time = millis();
 
   // setup PID
   pid = new PID_v2(config.Kp, config.Ki, config.Kd, PID::Direct);
@@ -193,8 +194,17 @@ void mqtt_publish_temps(void) {
 }
 
 void loop() {
+  now = millis();
+  while (now - pwm_window_start_time > config.pwm_update_int_ms) {
+	pwm_window_start_time += config.pwm_update_int_ms;
+  }
+  if (pid->Run(kiln_thermo->readCelsius()) < now - pwm_window_start_time)
+    digitalWrite(SSR_PIN, HIGH);
+  else
+    digitalWrite(SSR_PIN, LOW);
+
+
   // run handlers for subprocesses
-  pwm->pwmLoop();
   kiln_thermo->loop();
   housing_thermo->loop();
   mqtt_cli->loop();
@@ -296,19 +306,30 @@ void onConfigMessageReceived(const String &message) {
   char *eqptr = strchr(msg, '=');
   if (eqptr) {
     char *valptr = eqptr+1;
-    unsigned long val;
     *eqptr = NULL;
-    if (strcmp(msg, PRFS_THRM_UPD_INT_MS_FMT) == 0) {
-      val = strtoul(valptr, NULL, 0);
-      set_thermo_update_int_ms(val, true);
+    if (strcmp(msg, PRFS_THRM_UPD_INT_MS) == 0) {
+      unsigned long val = strtoul(valptr, NULL, 0);
+      config_set_thermo_update_int_ms(val, true);
       config_updated = true;
-    } else if (strcmp(msg, PRFS_PWM_UPD_INT_MS_FMT) == 0) {
-      val = strtoul(valptr, NULL, 0);
-      set_pwm_update_int_ms(val, true);
+    } else if (strcmp(msg, PRFS_PWM_UPD_INT_MS) == 0) {
+      unsigned long val = strtoul(valptr, NULL, 0);
+      config_set_pwm_update_int_ms(val, true);
       config_updated = true;
-    } else if (strcmp(msg, PRFS_MQTT_UPD_INT_MS_FMT) == 0) {
-      val = strtoul(valptr, NULL, 0);
-      set_mqtt_update_int_ms(val, true);
+    } else if (strcmp(msg, PRFS_MQTT_UPD_INT_MS) == 0) {
+      unsigned long val = strtoul(valptr, NULL, 0);
+      config_set_mqtt_update_int_ms(val, true);
+      config_updated = true;
+    } else if (strcmp(msg, PRFS_PID_KP) == 0) {
+      double val = strtod(valptr, NULL);
+      config_set_pid_init_Kp(val, true);
+      config_updated = true;
+    } else if (strcmp(msg, PRFS_PID_KI) == 0) {
+      double val = strtod(valptr, NULL);
+      config_set_pid_init_Ki(val, true);
+      config_updated = true;
+    } else if (strcmp(msg, PRFS_PID_KD) == 0) {
+      double val = strtod(valptr, NULL);
+      config_set_pid_init_Kd(val, true);
       config_updated = true;
     }
   }
