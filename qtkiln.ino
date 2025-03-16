@@ -37,9 +37,13 @@ const char *sspw = WIFI_PASS;
 #define MQTT_TOPIC_BASE "qtkiln"
 #define MQTT_TOPIC_FMT "%s/%s"
 #define MQTT_TOPIC_KILN_FMT "%s/kiln"
-#define MQTT_TOPIC_KILN_TEMP_FMT "%lu %0.2f"
+#define MQTT_KILN_TEMP_FMT "%lu %0.2f"
 #define MQTT_TOPIC_HOUSING_FMT "%s/housing"
-#define MQTT_TOPIC_HOUSING_TEMP_FMT "%lu %0.2f"
+#define MQTT_HOUSING_TEMP_FMT "%lu %0.2f"
+#define MQTT_TOPIC_PID_ENABLED_FMT "%s/pid_enabled"
+#define MQTT_PID_ENABLED_FMT "%u"
+#define MQTT_TOPIC_PID_SETTINGS_FMT "%s/pid_settings_Kp_Ki_Kd"
+#define MQTT_PID_SETTINGS_FMT "%g;%g;%g"
 #define MQTT_SUBTOPIC_CFG_FMT "%s/config"
 #define MQTT_SUBTOPIC_GET_FMT "%s/get"
 #define MQTT_SUBTOPIC_SET_FMT "%s/set"
@@ -56,6 +60,7 @@ PID_v2 *pid = NULL;
 #define PID_KP 10.0
 #define PID_KI 0.2
 #define PID_KD 0.1
+boolean pid_enabled = false;
 
 // configuration
 #define PRFS_PID_KI "initial_Ki"
@@ -151,6 +156,8 @@ void setup() {
 
   // setup PWM
   pinMode(SSR_PIN, OUTPUT);
+  // always turn it off incase we are coming back from a reset
+  digitalWrite(SSR_PIN, LOW);
   Serial.print("PWM cycle window in ms is ");
   Serial.println(config.pwm_update_int_ms);
   pwm_window_start_time = millis();
@@ -187,23 +194,38 @@ char buf1[MAX_BUF], buf2[MAX_BUF];
 
 void mqtt_publish_temps(void) {
     snprintf(buf1, MAX_BUF, MQTT_TOPIC_KILN_FMT, config.topic);
-    snprintf(buf2, MAX_BUF, MQTT_TOPIC_KILN_TEMP_FMT, kiln_thermo->lastTime(), kiln_thermo->readCelsius());
+    snprintf(buf2, MAX_BUF, MQTT_KILN_TEMP_FMT, kiln_thermo->lastTime(), kiln_thermo->readCelsius());
     mqtt_cli->publish(buf1, buf2);
     snprintf(buf1, MAX_BUF, MQTT_TOPIC_HOUSING_FMT, config.topic);
-    snprintf(buf2, MAX_BUF, MQTT_TOPIC_HOUSING_TEMP_FMT, kiln_thermo->lastTime(), housing_thermo->readCelsius());
+    snprintf(buf2, MAX_BUF, MQTT_HOUSING_TEMP_FMT, kiln_thermo->lastTime(), housing_thermo->readCelsius());
     mqtt_cli->publish(buf1, buf2);
 }
 
-bool ssr_state = off;
+void mqtt_publish_pid_enabled(void) {
+    snprintf(buf1, MAX_BUF, MQTT_TOPIC_PID_ENABLED_FMT, config.topic);
+    snprintf(buf2, MAX_BUF, MQTT_PID_ENABLED_FMT, pid_enabled);
+    mqtt_cli->publish(buf1, buf2);
+}
+void mqtt_publish_pid_settings(void) {
+    double Kp = pid->GetKp(), Ki = pid->GetKi(), Kd = pid->GetKd();
+
+    snprintf(buf1, MAX_BUF, MQTT_TOPIC_PID_SETTINGS_FMT, config.topic);
+    snprintf(buf2, MAX_BUF, MQTT_PID_SETTINGS_FMT, Kp, Ki, Kd);
+    mqtt_cli->publish(buf1, buf2);
+}
+
+bool ssr_state = false;
 void ssr_on(void) {
   if (ssr_state)
     return;
+  Serial.println("turning on SSR");
   ssr_state = true;
   digitalWrite(SSR_PIN, HIGH);
 }
 
 void ssr_off(void) {
   if (ssr_state) {
+    Serial.println("turning off SSR");
     ssr_state = false;
     digitalWrite(SSR_PIN, LOW);
   }
@@ -211,14 +233,15 @@ void ssr_off(void) {
 
 void loop() {
   now = millis();
-  while (now - pwm_window_start_time > config.pwm_update_int_ms) {
-	pwm_window_start_time += config.pwm_update_int_ms;
+  if (pid_enabled) {
+    while (now - pwm_window_start_time > config.pwm_update_int_ms) {
+      pwm_window_start_time += config.pwm_update_int_ms;
+    }
+    if (pid->Run(kiln_thermo->readCelsius()) < now - pwm_window_start_time)
+      ssr_on();
+    else
+      ssr_off();
   }
-  if (pid->Run(kiln_thermo->readCelsius()) < now - pwm_window_start_time)
-    ssr_on();
-  else
-    ssr_off();
-
 
   // run handlers for subprocesses
   kiln_thermo->loop();
@@ -363,8 +386,12 @@ void onConfigMessageReceived(const String &message) {
   }
 }
 
-#define MQTT_TARGET_TEMP_SET_MSG "target_temperature_C"
-#define MQTT_TEMP_GET_MSG "temperature_C"
+#define MQTT_SET_MSG_TARGET_TEMP "target_temperature_C"
+#define MQTT_SET_MSG_PID_ENABLED "pid_enabled"
+#define MQTT_GET_MSG_TEMP "temperature_C"
+#define MQTT_GET_MSG_PID_ENABLED MQTT_SET_MSG_PID_ENABLED
+#define MQTT_SET_MSG_PID_SETTINGS "pid_settings_Kp_Ki_Kd"
+#define MQTT_GET_MSG_PID_SETTINGS MQTT_SET_MSG_PID_SETTINGS
 // handle mqtt state messages
 void onSetStateMessageReceived(const String &message) {
   char msg[MAX_MSG_BUF];
@@ -374,13 +401,43 @@ void onSetStateMessageReceived(const String &message) {
   char *eqptr = strchr(msg, '=');
   if (eqptr) {
     char *valptr = eqptr+1;
-    unsigned long val;
     *eqptr = NULL;
-    if (strcmp(msg, MQTT_TARGET_TEMP_SET_MSG) == 0) {
-      val = strtoul(valptr, NULL, 0);
+    if (strcmp(msg, MQTT_SET_MSG_TARGET_TEMP) == 0) {
+      unsigned long val = strtoul(valptr, NULL, 0);
       Serial.print("target temperature set via mqtt to (C) ");
       Serial.println(val);
       //set_target_temperature_C(val);
+    } else if (strcmp(msg, MQTT_SET_MSG_PID_ENABLED) == 0) {
+      bool val = strtoul(valptr, NULL, 0);
+      Serial.print("pid enabled is set to ");
+      Serial.println(val);
+    } else if (strcmp(msg, MQTT_SET_MSG_PID_SETTINGS) == 0) {
+	// I don't love this use case
+      double Kp, Ki, Kd;
+      uint8_t sucs = 0;
+      char *nextptr = NULL;
+      // parse these sequentially and tally successful parses
+      // we can't check errno, but we can look for non null
+      // next ptrs
+      Kp = strtod(valptr, &nextptr);
+      if (nextptr) {
+        ++sucs;
+      	Ki = strtod(++nextptr, &valptr);
+      	if (valptr) {
+          ++sucs;
+          Kd = strtod(++valptr, NULL);
+        }
+      }
+      if ((Kp >= 0 & Ki >= 0 && Kd >= 0) && sucs == 2) { // parsed 2 out of the 3, send it wcgw
+	Serial.print("updating instaneous tunings from mqtt Kp = ");
+	Serial.print(Kp);
+	Serial.print(" Ki = ");
+	Serial.print(Ki);
+	Serial.print(" Kd = ");
+	Serial.println(Kd);
+	if (pid)
+	  pid->SetTunings(Kp, Ki, Kd);
+      }
     }
   }
 }
@@ -389,8 +446,12 @@ void onGetStateMessageReceived(const String &message) {
   message.toCharArray(msg, MAX_MSG_BUF);
 
   // the format should be key=value so if no = found, bad msg
-  if (strcmp(msg, MQTT_TEMP_GET_MSG) == 0) {
+  if (strcmp(msg, MQTT_GET_MSG_TEMP) == 0) {
     mqtt_publish_temps();
+  } else if (strcmp(msg, MQTT_GET_MSG_PID_ENABLED) == 0) {
+    mqtt_publish_pid_enabled();
+  } else if (strcmp(msg, MQTT_GET_MSG_PID_SETTINGS) == 0) {
+    mqtt_publish_pid_settings();
   }
 }
 
