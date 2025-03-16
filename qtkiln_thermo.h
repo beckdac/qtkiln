@@ -6,7 +6,8 @@
 class QTKilnThermo
 {
   public:
-    QTKilnThermo(uint16_t interval_ms);
+    QTKilnThermo(uint16_t interval_ms, float (* read_fptr)(void));
+
     void begin(void);
     void loop(void);
     unsigned long msSinceLastUpdate(void);

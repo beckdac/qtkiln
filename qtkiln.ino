@@ -5,6 +5,8 @@
 #include <SlowPWM.h>
 #include <EspMQTTClient.h>
 
+#include "qtkiln_thermo.h"
+
 // thermocouple phy
 #define MAXDO_PIN 5
 #define MAXCS0_PIN 3
@@ -12,6 +14,8 @@
 #define MAXSCK_PIN 4
 MAX6675 kiln_thermocouple(MAXSCK_PIN, MAXCS0_PIN, MAXDO_PIN);
 MAX6675 housing_thermocouple(MAXSCK_PIN, MAXCS1_PIN, MAXDO_PIN);
+QTKilnThermo *kiln_thermo;
+QTKilnThermo *housing_thermo;
 
 // WiFi credentials
 #define WIFI_SETUP_DELAY_MS 250
@@ -151,7 +155,8 @@ void setup() {
   mqtt_cli->enableHTTPWebUpdater("/");
 
   // do first thermocouple reading
-  thermocouple_update();
+  kiln_thermo = new QTKilnThermo(config.thermo_update_ms, &kiln_thermostat.readCelsius());
+  housing_thermo = new QTKilnThermo(config.thermo_update_ms, &housing_thermostat.readCelsius());
 }
 
 // state variables associated with the loop
@@ -159,30 +164,32 @@ float kiln_temperature, housing_temperature;
 // some of these could be declared in loop, but then
 // they would take allocated time on the heap each time
 // so we do them here instead
-unsigned long thermo_last_time, now, delta_t;
+unsigned long last_time = 0, now, delta_t;
 #define MAX_BUF 256
 char buf1[MAX_BUF], buf2[MAX_BUF];
 
 void loop() {
-  pwm->pwmLoop(); // run the PWM handler
-  mqtt_cli->loop(); // run the mqtt handler
+  // run handlers for subprocesses
+  pwm->pwmLoop();
+  kiln_thermo->loop();
+  housing_thermo->loop();
+  mqtt_cli->loop();
 
   now = millis();
   delta_t = now - last_time;
   // if we have waited long enough, update the thermos
-  if (delta_t >= config.thermo_update_int_ms) {
-    thermocouple_update();
+  if (delta_t >= config.mqtt_update_int_ms) {
     snprintf(buf1, MAX_BUF, MQTT_TOPIC_KILN_FMT, config.topic);
-    snprintf(buf2, MAX_BUF, MQTT_TOPIC_KILN_TEMP_FMT, kiln_temperature);
+    snprintf(buf2, MAX_BUF, MQTT_TOPIC_KILN_TEMP_FMT, kiln_thermo->readCelsius());
     mqtt_cli->publish(buf1, buf2);
     snprintf(buf1, MAX_BUF, MQTT_TOPIC_HOUSING_FMT, config.topic);
-    snprintf(buf2, MAX_BUF, MQTT_TOPIC_HOUSING_TEMP_FMT, housing_temperature);
+    snprintf(buf2, MAX_BUF, MQTT_TOPIC_HOUSING_TEMP_FMT, housing_thermo->readCelsius());
     mqtt_cli->publish(buf1, buf2);
-//    Serial.print("kiln C = "); 
-//    Serial.print(kiln_temperature);
-//    Serial.print(" housing C = ");
-//    Serial.println(housing_temperature);
-    now = millis();
+    //Serial.print("kiln C = "); 
+    //Serial.print(kiln_temperature);
+    //Serial.print(" housing C = ");
+    //Serial.println(housing_temperature);
+    last_time = millis();
   }
   // do a minimal delay for the PWM and other service loops
   delay(config.min_loop_ms);
