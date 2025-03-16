@@ -14,6 +14,7 @@ MAX6675 kiln_thermocouple(MAXSCK_PIN, MAXCS0_PIN, MAXDO_PIN);
 MAX6675 housing_thermocouple(MAXSCK_PIN, MAXCS1_PIN, MAXDO_PIN);
 
 // WiFi credentials
+#define WIFI_SETUP_DELAY_MS 250
 #include "wifi_cred.h"
 const char *ssid = WIFI_SSID;
 const char *sspw = WIFI_PASS;
@@ -22,6 +23,10 @@ const char *sspw = WIFI_PASS;
 #define MQTT_MAX_TOPIC_STR 256
 #define MQTT_TOPIC_BASE "qtkiln"
 #define MQTT_TOPIC_FMT "%s/%s"
+#define MQTT_TOPIC_KILN_FMT "%s/kiln"
+#define MQTT_TOPIC_KILN_TEMP_FMT "%0.2f"
+#define MQTT_TOPIC_HOUSING_FMT "%s/housing"
+#define MQTT_TOPIC_HOUSING_TEMP_FMT "%0.2f"
 #define MQTT_SUBTOPIC_CFG_FMT "%s/config"
 #define MQTT_SUBTOPIC_SET_FMT "%s/get"
 #define MQTT_SUBTOPIC_GET_FMT "%s/set"
@@ -34,7 +39,13 @@ EspMQTTClient *mqtt_cli = NULL;
 S_PWM *pwm = NULL;
 
 // configuration
-#define MAX_CFG_STR 24
+#define MAX_CFG_STR 32
+#define MIN_THERMO_UPDATE_MS 250
+#define MAX_THERMO_UPDATE_MS 5000
+#define MIN_PWM_UPDATE_MS 5000
+#define MAX_PWM_UPDATE_MS 20000
+#define MIN_MQTT_UPDATE_MS 250
+#define MAX_MQTT_UPDATE_MS 15000
 struct config {
   char mac[MAX_CFG_STR] = "c0:ff:ee:ca:fe:42";
   char topic[MAX_CFG_STR];
@@ -42,10 +53,6 @@ struct config {
   uint16_t PWM_update_int_ms = 5000;
   uint8_t min_loop_ms = 5;
 } config;
-#define MIN_THERMO_UPDATE_MS 250
-#define MAX_THERMO_UPDATE_MS 5000
-#define MIN_PWM_UPDATE_MS 5000
-#define MAX_PWM_UPDATE_MS 20000
 
 // state variables are found above the loop function
 
@@ -70,7 +77,7 @@ void setup() {
   // connect to wifi
   WiFi.begin(ssid, sspw);
   while (WiFi.status() != WL_CONNECTED) {
-    delay(1000);
+    delay(WIFI_SETUP_DELAY_MS);
   }
 
   // setup the config structure
@@ -82,12 +89,16 @@ void setup() {
       "%02x:%02x:%02x:%02x:%02x:%02x",
 	u8mac[0], u8mac[1], u8mac[2],
 	u8mac[3], u8mac[4], u8mac[5]);
+    Serial.print("MAC for this device is ");
+    Serial.println(config.mac);
   } else {
     Serial.println("failed to read MAC address");
   }
   // setup the topic based on the mac
   snprintf(config.topic, MAX_CFG_STR, MQTT_TOPIC_FMT,
 	MQTT_TOPIC_BASE, config.mac);
+  Serial.print("topic root for this device is ");
+  Serial.println(config.topic);
 
   // check some config variables against mins
   if (config.thermo_update_int_ms < MIN_THERMO_UPDATE_MS) {
@@ -114,6 +125,18 @@ void setup() {
     Serial.println(" ms ... forcing to max");
     config.PWM_update_int_ms = MAX_PWM_UPDATE_MS;
   }
+  if (config.mqtt_update_int_ms < MIN_MQTT_UPDATE_MS) {
+    Serial.print("mqtt update interval must be > ");
+    Serial.print(MIN_MQTT_UPDATE_MS);
+    Serial.println(" ms ... forcing to min");
+    config.mqtt_update_int_ms = MIN_MQTT_UPDATE_MS;
+  }
+  if (config.mqtt_update_int_ms > MAX_MQTT_UPDATE_MS) {
+    Serial.print("MQTT update interval must be < ");
+    Serial.print(MAX_MQTT_UPDATE_MS);
+    Serial.println(" ms ... forcing to max");
+    config.mqtt_update_int_ms = MAX_MQTT_UPDATE_MS;
+  }
 
   // setup PWM
   pwm = new S_PWM(SSR_PIN, config.PWM_update_int_ms);
@@ -123,7 +146,7 @@ void setup() {
   // start the mqtt client
   mqtt_cli = new EspMQTTClient(WIFI_SSID, WIFI_PASS, MQTT_BROKER,
     MQTT_USER, MQTT_PASS, config.mac, MQTT_PORT);
-  mqtt_cli->enableDebuggingMessages(true);
+  //mqtt_cli->enableDebuggingMessages(true);
   mqtt_cli->enableHTTPWebUpdater("/");
 
   // do first thermocouple reading
@@ -136,6 +159,8 @@ float kiln_temperature, housing_temperature;
 // they would take allocated time on the heap each time
 // so we do them here instead
 unsigned long last_time, now, delta_t;
+#define MAX_BUF 256
+char buf1[MAX_BUF], buf2[MAX_BUF];
 
 void loop() {
   pwm->pwmLoop(); // run the PWM handler
@@ -146,11 +171,16 @@ void loop() {
   // if we have waited long enough, update the thermos
   if (delta_t >= config.thermo_update_int_ms) {
     thermocouple_update();
-
-    Serial.print("kiln C = "); 
-    Serial.print(kiln_temperature);
-    Serial.print(" housing C = ");
-    Serial.println(housing_temperature);
+    snprintf(buf1, MAX_BUF, MQTT_TOPIC_KILN_FMT, config.topic);
+    snprintf(buf2, MAX_BUF, MQTT_TOPIC_KILN_TEMP_FMT, kiln_temperature);
+    mqtt_cli->publish(buf1, buf2);
+    snprintf(buf1, MAX_BUF, MQTT_TOPIC_HOUSING_FMT, config.topic);
+    snprintf(buf2, MAX_BUF, MQTT_TOPIC_HOUSING_TEMP_FMT, housing_temperature);
+    mqtt_cli->publish(buf1, buf2);
+//    Serial.print("kiln C = "); 
+//    Serial.print(kiln_temperature);
+//    Serial.print(" housing C = ");
+//    Serial.println(housing_temperature);
     now = millis();
   }
   // do a minimal delay for the PWM and other service loops
