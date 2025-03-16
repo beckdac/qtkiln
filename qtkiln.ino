@@ -144,9 +144,9 @@ void setup() {
      preferences.getUShort(PRFS_PWM_UPD_INT_MS, MIN_PWM_UPDATE_MS), false);
   config_set_mqtt_update_int_ms(
      preferences.getUShort(PRFS_MQTT_UPD_INT_MS, MIN_MQTT_UPDATE_MS), false);
-  config_set_init_pid_Kp(preferences.getDouble(PRFS_PID_KP, PID_KP), false);
-  config_set_init_pid_Kd(preferences.getDouble(PRFS_PID_KD, PID_KD), false);
-  config_set_init_pid_Ki(preferences.getDouble(PRFS_PID_KI, PID_KI), false);
+  config_set_pid_init_Kp(preferences.getDouble(PRFS_PID_KP, PID_KP), false);
+  config_set_pid_init_Kd(preferences.getDouble(PRFS_PID_KD, PID_KD), false);
+  config_set_pid_init_Ki(preferences.getDouble(PRFS_PID_KI, PID_KI), false);
 
   // setup PWM
   pinMode(SSR_PIN, OUTPUT);
