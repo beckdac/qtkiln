@@ -275,7 +275,7 @@ void onConfigMessageReceived(const String &message) {
     }
   }
 
-  if (config_update)
+  if (config_updated)
     esp_restart();
 }
 
