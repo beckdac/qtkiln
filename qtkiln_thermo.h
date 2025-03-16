@@ -15,6 +15,7 @@ class QTKilnThermo
     void disable(void);
     bool isEnabled(void);
     float readCelsius(void);
+    unsigned long lastTime(void);
 
   private:
     uint16_t _interval_ms = 250;	// default update period

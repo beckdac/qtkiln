@@ -35,9 +35,9 @@ const char *sspw = WIFI_PASS;
 #define MQTT_TOPIC_BASE "qtkiln"
 #define MQTT_TOPIC_FMT "%s/%s"
 #define MQTT_TOPIC_KILN_FMT "%s/kiln"
-#define MQTT_TOPIC_KILN_TEMP_FMT "%0.2f"
+#define MQTT_TOPIC_KILN_TEMP_FMT "%lu %0.2f"
 #define MQTT_TOPIC_HOUSING_FMT "%s/housing"
-#define MQTT_TOPIC_HOUSING_TEMP_FMT "%0.2f"
+#define MQTT_TOPIC_HOUSING_TEMP_FMT "%lu %0.2f"
 #define MQTT_SUBTOPIC_CFG_FMT "%s/config"
 #define MQTT_SUBTOPIC_SET_FMT "%s/get"
 #define MQTT_SUBTOPIC_GET_FMT "%s/set"
@@ -183,10 +183,10 @@ void loop() {
   // if we have waited long enough, update the thermos
   if (delta_t >= config.mqtt_update_int_ms) {
     snprintf(buf1, MAX_BUF, MQTT_TOPIC_KILN_FMT, config.topic);
-    snprintf(buf2, MAX_BUF, MQTT_TOPIC_KILN_TEMP_FMT, kiln_thermo->readCelsius());
+    snprintf(buf2, MAX_BUF, MQTT_TOPIC_KILN_TEMP_FMT, kiln_thermo->lastTime, kiln_thermo->readCelsius());
     mqtt_cli->publish(buf1, buf2);
     snprintf(buf1, MAX_BUF, MQTT_TOPIC_HOUSING_FMT, config.topic);
-    snprintf(buf2, MAX_BUF, MQTT_TOPIC_HOUSING_TEMP_FMT, housing_thermo->readCelsius());
+    snprintf(buf2, MAX_BUF, MQTT_TOPIC_HOUSING_TEMP_FMT, kiln_thermo->lastTime, housing_thermo->readCelsius());
     mqtt_cli->publish(buf1, buf2);
     //Serial.print("kiln C = "); 
     //Serial.print(kiln_thermo->readCelsius());

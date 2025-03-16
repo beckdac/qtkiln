@@ -27,6 +27,10 @@ unsigned long QTKilnThermo::msSinceLastUpdate(void) {
   return now - _lastTime;
 }
 
+unsigned long QTKilnThermo::lastTime(void) {
+  return _lastTime;
+}
+
 float QTKilnThermo::readCelsius(void) {
   return _lastTempC;
 }
