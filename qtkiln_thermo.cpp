@@ -3,11 +3,11 @@
 
 QTKilnThermo::QTKilnThermo(uint16_t interval_ms, float (* read_fptr)(void)) {
   _interval_ms = interval_ms;
-  _read_fptr = read_fptr
+  _read_fptr = read_fptr;
 }
 
 void QTKilnThermo::begin(void) {
-  _last_time = millis();
+  _lastTime = millis();
 }
 
 void QTKilnThermo::enable(void) {

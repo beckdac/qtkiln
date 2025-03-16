@@ -155,15 +155,11 @@ void setup() {
   mqtt_cli->enableHTTPWebUpdater("/");
 
   // do first thermocouple reading
-  kiln_thermo = new QTKilnThermo(config.thermo_update_ms, &kiln_thermostat.readCelsius());
-  housing_thermo = new QTKilnThermo(config.thermo_update_ms, &housing_thermostat.readCelsius());
+  kiln_thermo = new QTKilnThermo(config.thermo_update_int_ms, &kiln_thermocouple.readCelsius());
+  housing_thermo = new QTKilnThermo(config.thermo_update_int_ms, &housing_thermocouple.readCelsius());
 }
 
-// state variables associated with the loop
-float kiln_temperature, housing_temperature;
-// some of these could be declared in loop, but then
-// they would take allocated time on the heap each time
-// so we do them here instead
+// state or preallocated variables for loop
 unsigned long last_time = 0, now, delta_t;
 #define MAX_BUF 256
 char buf1[MAX_BUF], buf2[MAX_BUF];
@@ -186,20 +182,13 @@ void loop() {
     snprintf(buf2, MAX_BUF, MQTT_TOPIC_HOUSING_TEMP_FMT, housing_thermo->readCelsius());
     mqtt_cli->publish(buf1, buf2);
     //Serial.print("kiln C = "); 
-    //Serial.print(kiln_temperature);
+    //Serial.print(kiln_thermo->readCelsius());
     //Serial.print(" housing C = ");
-    //Serial.println(housing_temperature);
+    //Serial.println(housing_thermo->readCelsius());
     last_time = millis();
   }
   // do a minimal delay for the PWM and other service loops
   delay(config.min_loop_ms);
-}
-
-// read the thermocouples and update hte last updated 
-void thermocouple_update(void) {
-  kiln_temperature = kiln_thermocouple.readCelsius();
-  housing_temperature = housing_thermocouple.readCelsius();
-  last_time = millis();
 }
 
 // handle mqtt config messages
