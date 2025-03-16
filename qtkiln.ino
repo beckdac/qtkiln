@@ -96,7 +96,10 @@ void loop() {
     Serial.println(housing_temperature);
     now = millis();
   }
-  delay(config.update_interval_ms - (now-last_time));
+  // delay for the remainder of an interval + at least 1 ms
+  // to ensur that the next call always triggers a read
+  // this reduces spurious loop() calls that have no effect
+  delay((config.update_interval_ms - (now-last_time))+1);
 }
 
 // read the thermocouples and update hte last updated 
