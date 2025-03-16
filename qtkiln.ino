@@ -159,7 +159,7 @@ float kiln_temperature, housing_temperature;
 // some of these could be declared in loop, but then
 // they would take allocated time on the heap each time
 // so we do them here instead
-unsigned long last_time, now, delta_t;
+unsigned long thermo_last_time, now, delta_t;
 #define MAX_BUF 256
 char buf1[MAX_BUF], buf2[MAX_BUF];
 
