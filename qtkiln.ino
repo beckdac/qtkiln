@@ -5,12 +5,12 @@
 #include <SlowPWM.h>
 
 // thermocouple phy
-const unsigned int MAXDO = 5;
-const unsigned int MAXCS0 = 3;
-const unsigned int MAXCS1 = 2;
-const unsigned int MAXSCK = 4;
-MAX6675 kiln_thermocouple(MAXSCK, MAXCS0, MAXDO);
-MAX6675 housing_thermocouple(MAXSCK, MAXCS1, MAXDO);
+#define MAXDO_PIN 5
+#define MAXCS0_PIN 3
+#define MAXCS1_PIN 2
+#define MAXSCK_PIN 4
+MAX6675 kiln_thermocouple(MAXSCK_PIN, MAXCS0_PIN, MAXDO_PIN);
+MAX6675 housing_thermocouple(MAXSCK_PIN, MAXCS1_PIN, MAXDO_PIN);
 
 // WiFi credentials
 #include "wifi_cred.h"
@@ -25,6 +25,7 @@ const char *mqtt_password = "hotashell";
 const int mqtt_port = 1883;
 
 // PWM object
+#define SSR_PIN 8
 S_PWM *pwm = NULL;
 
 // configuration
@@ -34,6 +35,7 @@ struct config {
   char topic[MAX_CFG_STR];
   uint16_t thermo_update_int_ms = 250;
   uint16_t PWM_update_int_ms = 5000;
+  uint8_t min_loop_ms = 5;
 } config;
 #define MIN_THERMO_UPDATE_MS 250
 #define MAX_THERMO_UPDATE_MS 5000
@@ -105,7 +107,7 @@ void setup() {
   }
 
   // setup PWM
-  pwm = S_PWM(SSR_PIN, config.PWM_update_int_ms);
+  pwm = new S_PWM(SSR_PIN, config.PWM_update_int_ms);
   pwm->setDuty(0);
   pwm->begin();
 
