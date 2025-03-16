@@ -36,7 +36,7 @@ float QTKilnThermo::readCelsius(void) {
   return _lastTempC;
 }
 
-float QTKilnThermo::_doRead(void) {
+void QTKilnThermo::_doRead(void) {
   _lastTempC = (_read_fptr ? _read_fptr() : -1);
   _lastTime = millis();
 }
