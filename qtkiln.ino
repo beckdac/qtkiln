@@ -40,6 +40,7 @@ S_PWM *pwm = NULL;
 
 // configuration
 #define MAX_CFG_STR 32
+#define MAC_FMT_STR "%02X%02X%02X%02X%02X%02X"  
 #define MIN_THERMO_UPDATE_MS 250
 #define MAX_THERMO_UPDATE_MS 5000
 #define MIN_PWM_UPDATE_MS 5000
@@ -51,6 +52,7 @@ struct config {
   char topic[MAX_CFG_STR];
   uint16_t thermo_update_int_ms = 250;
   uint16_t PWM_update_int_ms = 5000;
+  uint16_t mqtt_update_int_ms = 1000;
   uint8_t min_loop_ms = 5;
 } config;
 
@@ -85,8 +87,7 @@ void setup() {
   // get the mac
   esp_err_t ret = esp_wifi_get_mac(WIFI_IF_STA, u8mac);
   if (ret == ESP_OK) {
-    snprintf(config.mac, MAX_CFG_STR, 
-      "%02x:%02x:%02x:%02x:%02x:%02x",
+    snprintf(config.mac, MAX_CFG_STR, MAC_FMT_STR,
 	u8mac[0], u8mac[1], u8mac[2],
 	u8mac[3], u8mac[4], u8mac[5]);
     Serial.print("MAC for this device is ");
