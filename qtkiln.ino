@@ -16,6 +16,13 @@ MAX6675 kiln_thermocouple(MAXSCK_PIN, MAXCS0_PIN, MAXDO_PIN);
 MAX6675 housing_thermocouple(MAXSCK_PIN, MAXCS1_PIN, MAXDO_PIN);
 QTKilnThermo *kiln_thermo;
 QTKilnThermo *housing_thermo;
+// wrappers to circumvent address of bound member function
+float kiln_readCelsius(void) {
+  kiln_thermocouple.readCelsius();
+}
+float housing_readCelsius(void) {
+  housing_thermocouple.readCelsius();
+}
 
 // WiFi credentials
 #define WIFI_SETUP_DELAY_MS 250
@@ -155,8 +162,8 @@ void setup() {
   mqtt_cli->enableHTTPWebUpdater("/");
 
   // do first thermocouple reading
-  kiln_thermo = new QTKilnThermo(config.thermo_update_int_ms, &kiln_thermocouple.readCelsius);
-  housing_thermo = new QTKilnThermo(config.thermo_update_int_ms, &housing_thermocouple.readCelsius);
+  kiln_thermo = new QTKilnThermo(config.thermo_update_int_ms, &kiln_readCelsius);
+  housing_thermo = new QTKilnThermo(config.thermo_update_int_ms, &housing_readCelsius);
 }
 
 // state or preallocated variables for loop
