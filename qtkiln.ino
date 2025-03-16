@@ -278,17 +278,17 @@ void config_set_mqtt_update_int_ms(uint16_t mqtt_update_int_ms, bool update_pref
   if (update_prefs)
      preferences.putUInt(PRFS_MQTT_UPD_INT_MS, config.mqtt_update_int_ms);
 }
-void config_set_init_pid_Kp(double Kp, bool update_prefs) {
+void config_set_pid_init_Kp(double Kp, bool update_prefs) {
   config.Kp = Kp;
   if (update_prefs)
      preferences.putDouble(PRFS_PID_KP, config.Kp);
 }
-void config_set_init_pid_Ki(double Ki, bool update_prefs) {
+void config_set_pid_init_Ki(double Ki, bool update_prefs) {
   config.Ki = Ki;
   if (update_prefs)
      preferences.putDouble(PRFS_PID_KI, config.Ki);
 }
-void config_set_init_pid_Kd(double Kd, bool update_prefs) {
+void config_set_pid_init_Kd(double Kd, bool update_prefs) {
   config.Kd = Kd;
   if (update_prefs)
      preferences.putDouble(PRFS_PID_KD, config.Kd);
