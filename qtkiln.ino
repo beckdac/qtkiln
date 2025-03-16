@@ -105,6 +105,7 @@ void setup() {
   // load up the preferences so we can overwrite
   // the config defaults
   preferences.begin("qtkiln", false);
+  //preferences.clear();
 
   // wait for MAX chip to stabilize
   delay(500);
@@ -238,7 +239,7 @@ void config_set_thermo_update_int_ms(uint16_t thermo_update_int_ms, bool update_
   Serial.print("thermocouple update interval (ms) = ");
   Serial.println(config.thermo_update_int_ms);
   if (update_prefs)
-     preferences.putUInt(PRFS_THRM_UPD_INT_MS, config.thermo_update_int_ms);
+     preferences.putUShort(PRFS_THRM_UPD_INT_MS, config.thermo_update_int_ms);
 }
 void config_set_pwm_update_int_ms(uint16_t pwm_update_int_ms, bool update_prefs) {
   if (pwm_update_int_ms < MIN_PWM_UPDATE_MS) {
@@ -257,7 +258,7 @@ void config_set_pwm_update_int_ms(uint16_t pwm_update_int_ms, bool update_prefs)
   Serial.print("PWM update interval (ms) = ");
   Serial.println(config.pwm_update_int_ms);
   if (update_prefs)
-     preferences.putUInt(PRFS_PWM_UPD_INT_MS, config.pwm_update_int_ms);
+     preferences.putUShort(PRFS_PWM_UPD_INT_MS, config.pwm_update_int_ms);
 }
 void config_set_mqtt_update_int_ms(uint16_t mqtt_update_int_ms, bool update_prefs) {
   if (mqtt_update_int_ms < MIN_MQTT_UPDATE_MS) {
@@ -276,20 +277,26 @@ void config_set_mqtt_update_int_ms(uint16_t mqtt_update_int_ms, bool update_pref
   Serial.print("mqtt update interval (ms) = ");
   Serial.println(config.mqtt_update_int_ms);
   if (update_prefs)
-     preferences.putUInt(PRFS_MQTT_UPD_INT_MS, config.mqtt_update_int_ms);
+     preferences.putUShort(PRFS_MQTT_UPD_INT_MS, config.mqtt_update_int_ms);
 }
 void config_set_pid_init_Kp(double Kp, bool update_prefs) {
   config.Kp = Kp;
+  Serial.print("PID initial Kp set to ");
+  Serial.println(config.Kp);
   if (update_prefs)
      preferences.putDouble(PRFS_PID_KP, config.Kp);
 }
 void config_set_pid_init_Ki(double Ki, bool update_prefs) {
   config.Ki = Ki;
+  Serial.print("PID initial Ki set to ");
+  Serial.println(config.Ki);
   if (update_prefs)
      preferences.putDouble(PRFS_PID_KI, config.Ki);
 }
 void config_set_pid_init_Kd(double Kd, bool update_prefs) {
   config.Kd = Kd;
+  Serial.print("PID initial Kd set to ");
+  Serial.println(config.Kd);
   if (update_prefs)
      preferences.putDouble(PRFS_PID_KD, config.Kd);
 }
@@ -336,6 +343,7 @@ void onConfigMessageReceived(const String &message) {
 
   if (config_updated) {
     Serial.println("system configuration updated, restarting...");
+    delay(1000);
     esp_restart();
   }
 }
