@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include <max6675.h>
 #include <SlowPWM.h>
+#include <EspMQTTClient.h>
 
 // thermocouple phy
 #define MAXDO_PIN 5
@@ -18,11 +19,10 @@ const char *ssid = WIFI_SSID;
 const char *sspw = WIFI_PASS;
 
 // MQTT server
-const char *mqtt_broker = "192.168.1.3";
-const char *topic_base = "qtkiln";
-const char *mqtt_username = "qtkiln";
-const char *mqtt_password = "hotashell";
-const int mqtt_port = 1883;
+#define MQTT_BrOKER "192.168.1.3"
+#define TOPIC_BASE "qtkiln"
+#include "mqtt_cred.h"
+EqpMQTTClient *mqtt_cli = NULL;
 
 // PWM object
 #define SSR_PIN 8
@@ -108,8 +108,12 @@ void setup() {
 
   // setup PWM
   pwm = new S_PWM(SSR_PIN, config.PWM_update_int_ms);
-  pwm->setDuty(0);
+  pwm->setDuty(50);
   pwm->begin();
+
+  // start the mqtt client
+  mqtt_cli = new EspMQTTClient client(WIFI_SSID, WIFI_PASS,
+    MQTT_BROKER, MQTT_USER, MQTT_PASS, config.mac, MQTT_PORT);
 
   // do first thermocouple reading
   thermocouple_update();
@@ -137,13 +141,8 @@ void loop() {
     Serial.println(housing_temperature);
     now = millis();
   }
+  // do a minimal delay for the PWM and other service loops
   delay(config.min_loop_ms);
-#if 0
-  // delay for the remainder of an interval + at least 1 ms
-  // to ensur that the next call always triggers a read
-  // this reduces spurious loop() calls that have no effect
-  delay((config.thermo_update_int_ms - (now-last_time))+1);
-#endif 
 }
 
 // read the thermocouples and update hte last updated 
