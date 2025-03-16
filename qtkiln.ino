@@ -28,14 +28,13 @@ const int mqtt_port = 1883;
 struct config {
   char mac[MAX_CFG_STR] = "c0:ff:ee:ca:fe:42";
   char topic[MAX_CFG_STR];
-  uint16_t sample_kiln_ms;
-  uint16_t sample_housing_ms;
+  uint16_t update_interval_ms;
 } config;
 
 // state variables are found above the loop function
 
 // prototypes
-void thermocouple_update(boolean kiln, boolean housing);
+void thermocouple_update(void);
 
 // initialize the hardware and provide for any startup
 // delays according to manufacturer data sheets
@@ -77,40 +76,40 @@ void setup() {
   }
 
   // do first thermocouple reading
-  thermocouple_update(true, true);
-}
-
-void thermocouple_update(boolean kiln, boolean housing) {
-  if (kiln)
-    kiln_temperature = kiln_thermocouple.readCelsius();
-  if (housing)
-    housing_temperature = housing_thermocouple.readCelsius();
-  last_time = millis();
+  thermocouple_update();
 }
 
 // state variables associated with the loop
 float kiln_temperature, housing_temperature;
-unsigned long last_time, now, delta_t;
-uint16_t loop_time;
+unsigned long last_time, now, delta_t, loop_time;
 
 void loop() {
   now = millis();
   delta_t = now - last_time;
+  // if we have waited long enough, update the thermos
   if (delta_t >= config.update_interval_ms) {
-    thermocouple_update(true, true);
+    thermocouple_update();
+
+    Serial.print("kiln C = "); 
+    Serial.print(kiln_temperature);
+    Serial.print(" housing C = ");
+    Serial.println(housing_temperature);
+
+    // how long did it take us to update the thermos
+    // and run the rest of the main loop
+    now = millis();
+    loop_time = ((now-last_time)-delta_t);
+    // now delay the update interval minimum time
+    Serial.println(loop_time);
+    Serial.println(config.update_interval_ms - (now-last_time));
   }
-
-  Serial.print("kiln C = "); 
-  Serial.print(kiln_temperature);
-  Serial.print(" housing C = ");
-  Serial.println(housing_temperature);
-
-  // how long did it take us to update the thermos
-  // and run the rest of the main loop
-  now = millis();
-  loop_time = (uint16_t)((now-last_time)-delta_t);
-  // now delay the update interval minimum time
-  Serial.println(config.update_interval_ms - (now-last_time));
   delay(config.update_interval_ms - (now-last_time));
+}
+
+// read the thermocouples and update hte last updated 
+void thermocouple_update(void) {
+  kiln_temperature = kiln_thermocouple.readCelsius();
+  housing_temperature = housing_thermocouple.readCelsius();
+  last_time = millis();
 }
 
