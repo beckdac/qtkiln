@@ -18,10 +18,10 @@ QTKilnThermo *kiln_thermo;
 QTKilnThermo *housing_thermo;
 // wrappers to circumvent address of bound member function
 float kiln_readCelsius(void) {
-  kiln_thermocouple.readCelsius();
+  return kiln_thermocouple.readCelsius();
 }
 float housing_readCelsius(void) {
-  housing_thermocouple.readCelsius();
+  return housing_thermocouple.readCelsius();
 }
 
 // WiFi credentials
