@@ -91,6 +91,9 @@ void setup() {
 
 // state variables associated with the loop
 float kiln_temperature, housing_temperature;
+// some of these could be declared in loop, but then
+// they would take allocated time on the heap each time
+// so we do them here instead
 unsigned long last_time, now, delta_t;
 
 void loop() {
@@ -118,4 +121,3 @@ void thermocouple_update(void) {
   housing_temperature = housing_thermocouple.readCelsius();
   last_time = millis();
 }
-
