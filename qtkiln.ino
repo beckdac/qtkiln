@@ -53,7 +53,7 @@ S_PWM *pwm = NULL;
 
 // configuration
 #define PRFS_THRM_UPD_INT_MS_FMT "thrm_upd_int_ms"
-#define PRFS_PWM_UPD_INT_MS_FMT "PWM_upd_int_ms"
+#define PRFS_PWM_UPD_INT_MS_FMT "pwm_upd_int_ms"
 #define PRFS_MQTT_UPD_INT_MS_FMT "mqtt_upd_int_ms"
 Preferences preferences;
 #define MAX_CFG_STR 32
@@ -68,7 +68,7 @@ struct config {
   char mac[MAX_CFG_STR] = "c0:ff:ee:ca:fe:42";
   char topic[MAX_CFG_STR];
   uint16_t thermo_update_int_ms = 250;
-  uint16_t PWM_update_int_ms = 5000;
+  uint16_t pwm_update_int_ms = 5000;
   uint16_t mqtt_update_int_ms = 1000;
   uint8_t min_loop_ms = 5;
 } config;
@@ -123,54 +123,15 @@ void setup() {
   Serial.println(config.topic);
 
   // check some config variables against mins
-  config.thermo_update_int_ms = preferences.getUInt(PRFS_THRM_UPD_INT_MS_FMT, MIN_THERMO_UPDATE_MS);
-  if (config.thermo_update_int_ms < MIN_THERMO_UPDATE_MS) {
-    Serial.print("thermocouple update interval must be > ");
-    Serial.print(MIN_THERMO_UPDATE_MS);
-    Serial.println(" ms ... forcing to min");
-    config.thermo_update_int_ms = MIN_THERMO_UPDATE_MS;
-  }
-  if (config.thermo_update_int_ms > MAX_THERMO_UPDATE_MS) {
-    Serial.print("thermocouple update interval must be < ");
-    Serial.print(MAX_THERMO_UPDATE_MS);
-    Serial.println(" ms ... forcing to max");
-    config.thermo_update_int_ms = MAX_THERMO_UPDATE_MS;
-  }
-  Serial.print("thermocouple update interval (ms) = ");
-  Serial.println(config.thermo_update_int_ms);
-  config.PWM_update_int_ms = preferences.getUInt(PRFS_PWM_UPD_INT_MS_FMT, MIN_PWM_UPDATE_MS);
-  if (config.PWM_update_int_ms < MIN_PWM_UPDATE_MS) {
-    Serial.print("PWM update interval must be > ");
-    Serial.print(MIN_PWM_UPDATE_MS);
-    Serial.println(" ms ... forcing to min");
-    config.PWM_update_int_ms = MIN_PWM_UPDATE_MS;
-  }
-  if (config.PWM_update_int_ms > MAX_PWM_UPDATE_MS) {
-    Serial.print("PWM update interval must be < ");
-    Serial.print(MAX_PWM_UPDATE_MS);
-    Serial.println(" ms ... forcing to max");
-    config.PWM_update_int_ms = MAX_PWM_UPDATE_MS;
-  }
-  Serial.print("PWM update interval (ms) = ");
-  Serial.println(config.PWM_update_int_ms);
-  config.mqtt_update_int_ms = preferences.getUInt(PRFS_MQTT_UPD_INT_MS_FMT, MIN_MQTT_UPDATE_MS);
-  if (config.mqtt_update_int_ms < MIN_MQTT_UPDATE_MS) {
-    Serial.print("mqtt update interval must be > ");
-    Serial.print(MIN_MQTT_UPDATE_MS);
-    Serial.println(" ms ... forcing to min");
-    config.mqtt_update_int_ms = MIN_MQTT_UPDATE_MS;
-  }
-  if (config.mqtt_update_int_ms > MAX_MQTT_UPDATE_MS) {
-    Serial.print("MQTT update interval must be < ");
-    Serial.print(MAX_MQTT_UPDATE_MS);
-    Serial.println(" ms ... forcing to max");
-    config.mqtt_update_int_ms = MAX_MQTT_UPDATE_MS;
-  }
-  Serial.print("mqtt update interval (ms) = ");
-  Serial.println(config.mqtt_update_int_ms);
+  set_thermo_update_int_ms(
+     preferences.getUInt(PRFS_THRM_UPD_INT_MS_FMT, MIN_THERMO_UPDATE_MS));
+  set_pwm_update_int_ms(
+     preferences.getUInt(PRFS_PWM_UPD_INT_MS_FMT, MIN_PWM_UPDATE_MS));
+  set_mqtt_update_int_ms(
+     preferences.getUInt(PRFS_MQTT_UPD_INT_MS_FMT, MIN_MQTT_UPDATE_MS));
 
   // setup PWM
-  pwm = new S_PWM(SSR_PIN, config.PWM_update_int_ms);
+  pwm = new S_PWM(SSR_PIN, config.pwm_update_int_ms);
   pwm->setDuty(0); // force duty cycle to 0
   pwm->begin();
   Serial.println("PWM is running");
@@ -223,6 +184,60 @@ void loop() {
   // do a minimal delay for the PWM and other service loops
   delay(config.min_loop_ms);
 }
+
+// set configuration variables after checking them
+void set_thermo_update_int_ms(uint16_t thermo_update_int_ms) {
+  if (thermo_update_int_ms < MIN_THERMO_UPDATE_MS) {
+    Serial.print("thermocouple update interval must be > ");
+    Serial.print(MIN_THERMO_UPDATE_MS);
+    Serial.println(" ms ... forcing to min");
+    thermo_update_int_ms = MIN_THERMO_UPDATE_MS;
+  }
+  if (thermo_update_int_ms > MAX_THERMO_UPDATE_MS) {
+    Serial.print("thermocouple update interval must be < ");
+    Serial.print(MAX_THERMO_UPDATE_MS);
+    Serial.println(" ms ... forcing to max");
+    thermo_update_int_ms = MAX_THERMO_UPDATE_MS;
+  }
+  config.thermo_update_int_ms = thermo_update_int_ms;
+  Serial.print("thermocouple update interval (ms) = ");
+  Serial.println(config.thermo_update_int_ms);
+}
+void set_pwm_update_int_ms(uint16_t pwm_update_int_ms) {
+  if (pwm_update_int_ms < MIN_PWM_UPDATE_MS) {
+    Serial.print("PWM update interval must be > ");
+    Serial.print(MIN_PWM_UPDATE_MS);
+    Serial.println(" ms ... forcing to min");
+    pwm_update_int_ms = MIN_PWM_UPDATE_MS;
+  }
+  if (pwm_update_int_ms > MAX_PWM_UPDATE_MS) {
+    Serial.print("PWM update interval must be < ");
+    Serial.print(MAX_PWM_UPDATE_MS);
+    Serial.println(" ms ... forcing to max");
+    pwm_update_int_ms = MAX_PWM_UPDATE_MS;
+  }
+  config.pwm_update_int_ms = pwm_update_int_ms;
+  Serial.print("PWM update interval (ms) = ");
+  Serial.println(config.pwm_update_int_ms);
+}
+void set_mqtt_update_int_ms(uint16_t mqtt_update_int_ms) {
+  if (mqtt_update_int_ms < MIN_MQTT_UPDATE_MS) {
+    Serial.print("mqtt update interval must be > ");
+    Serial.print(MIN_MQTT_UPDATE_MS);
+    Serial.println(" ms ... forcing to min");
+    mqtt_update_int_ms = MIN_MQTT_UPDATE_MS;
+  }
+  if (mqtt_update_int_ms > MAX_MQTT_UPDATE_MS) {
+    Serial.print("MQTT update interval must be < ");
+    Serial.print(MAX_MQTT_UPDATE_MS);
+    Serial.println(" ms ... forcing to max");
+    mqtt_update_int_ms = MAX_MQTT_UPDATE_MS;
+  }
+  config.mqtt_update_int_ms = mqtt_update_int_ms;
+  Serial.print("mqtt update interval (ms) = ");
+  Serial.println(config.mqtt_update_int_ms);
+}
+
 
 // handle mqtt config messages
 void onConfigMessageReceived(const String &message) {
