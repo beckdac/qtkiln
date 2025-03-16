@@ -44,6 +44,7 @@ const char *sspw = WIFI_PASS;
 #define MQTT_PID_ENABLED_FMT "%u"
 #define MQTT_TOPIC_PID_SETTINGS_FMT "%s/pid_settings_Kp_Ki_Kd"
 #define MQTT_PID_SETTINGS_FMT "%g;%g;%g"
+#define MQTT_SET_MSG_PID_SETTINGS_FMT MQTT_PID_SETTINGS_FMT
 #define MQTT_SUBTOPIC_CFG_FMT "%s/config"
 #define MQTT_SUBTOPIC_GET_FMT "%s/get"
 #define MQTT_SUBTOPIC_SET_FMT "%s/set"
@@ -412,23 +413,9 @@ void onSetStateMessageReceived(const String &message) {
       Serial.print("pid enabled is set to ");
       Serial.println(val);
     } else if (strcmp(msg, MQTT_SET_MSG_PID_SETTINGS) == 0) {
-	// I don't love this use case
       double Kp, Ki, Kd;
-      uint8_t sucs = 0;
-      char *nextptr = NULL;
-      // parse these sequentially and tally successful parses
-      // we can't check errno, but we can look for non null
-      // next ptrs
-      Kp = strtod(valptr, &nextptr);
-      if (nextptr) {
-        ++sucs;
-      	Ki = strtod(++nextptr, &valptr);
-      	if (valptr) {
-          ++sucs;
-          Kd = strtod(++valptr, NULL);
-        }
-      }
-      if ((Kp >= 0 & Ki >= 0 && Kd >= 0) && sucs == 2) { // parsed 2 out of the 3, send it wcgw
+      uint8_t parsed = sscanf(valptr, MQTT_SET_MSG_PID_SETTINGS_FMT, &Kp, &Ki, &Kd);
+      if ((Kp >= 0 & Ki >= 0 && Kd >= 0) && parsed == 3) {
 	Serial.print("updating instaneous tunings from mqtt Kp = ");
 	Serial.print(Kp);
 	Serial.print(" Ki = ");
