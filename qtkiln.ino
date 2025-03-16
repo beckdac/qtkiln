@@ -19,7 +19,12 @@ const char *ssid = WIFI_SSID;
 const char *sspw = WIFI_PASS;
 
 // MQTT server
-#define TOPIC_BASE "qtkiln"
+#define MQTT_MAX_TOPIC_STR 256
+#define MQTT_TOPIC_BASE "qtkiln"
+#define MQTT_TOPIC_FMT "qtkiln/%s"
+#define MQTT_SUBTOPIC_CFG_FMT "%s/config"
+#define MQTT_SUBTOPIC_SET_FMT "%s/get"
+#define MQTT_SUBTOPIC_GET_FMT "%s/set"
 #include "mqtt_cred.h"
 EspMQTTClient *mqtt_cli = NULL;
 
@@ -45,6 +50,10 @@ struct config {
 
 // prototypes
 void thermocouple_update(void);
+void onConnectionEstablished(void);
+void onConfigMessageReceived(const String &message);
+void onStateSetMessageReceived(const String &message);
+void onStateSetMessageReceived(const String &message);
 
 // initialize the hardware and provide for any startup
 // delays according to manufacturer data sheets
@@ -107,7 +116,7 @@ void setup() {
 
   // setup PWM
   pwm = new S_PWM(SSR_PIN, config.PWM_update_int_ms);
-  pwm->setDuty(50);
+  pwm->setDuty(0); // force duty cycle to 0
   pwm->begin();
 
   // start the mqtt client
@@ -149,4 +158,26 @@ void thermocouple_update(void) {
   kiln_temperature = kiln_thermocouple.readCelsius();
   housing_temperature = housing_thermocouple.readCelsius();
   last_time = millis();
+}
+
+// handle mqtt config messages
+void onConfigMessageReceived(const String &message) {
+}
+
+// handle mqtt state messages
+void onSetStateMessageReceived(const String &message) {
+}
+void onGetStateMessageReceived(const String &message) {
+}
+
+// when the connection to the mqtt has completed
+void onConnectionEstablished(void) {
+  char *buf[MAX_TOPIC_STR];
+  snprintf(buf, MAX_TOPIC_STR, MQTT_SUBTOPIC_CFG_FMT, config.topic);
+  mqtt_cli.subscribe(
+"mytopic/test", [] (const String &payload)  {
+    Serial.println(payload);
+  });
+
+  mqtt_cli.publish("mytopic/test", "This is a message");
 }
