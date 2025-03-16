@@ -123,6 +123,8 @@ void setup() {
   // start the mqtt client
   mqtt_cli = new EspMQTTClient(WIFI_SSID, WIFI_PASS, MQTT_BROKER,
     MQTT_USER, MQTT_PASS, config.mac, MQTT_PORT);
+  mqtt_cli->enableDebuggingMessages(true);
+  mqtt_cli->enableHTTPWebUpdater("/");
 
   // do first thermocouple reading
   thermocouple_update();
@@ -137,6 +139,7 @@ unsigned long last_time, now, delta_t;
 
 void loop() {
   pwm->pwmLoop(); // run the PWM handler
+  mqtt_cli->loop(); // run the mqtt handler
 
   now = millis();
   delta_t = now - last_time;
