@@ -183,10 +183,10 @@ void loop() {
   // if we have waited long enough, update the thermos
   if (delta_t >= config.mqtt_update_int_ms) {
     snprintf(buf1, MAX_BUF, MQTT_TOPIC_KILN_FMT, config.topic);
-    snprintf(buf2, MAX_BUF, MQTT_TOPIC_KILN_TEMP_FMT, kiln_thermo->lastTime, kiln_thermo->readCelsius());
+    snprintf(buf2, MAX_BUF, MQTT_TOPIC_KILN_TEMP_FMT, kiln_thermo->lastTime(), kiln_thermo->readCelsius());
     mqtt_cli->publish(buf1, buf2);
     snprintf(buf1, MAX_BUF, MQTT_TOPIC_HOUSING_FMT, config.topic);
-    snprintf(buf2, MAX_BUF, MQTT_TOPIC_HOUSING_TEMP_FMT, kiln_thermo->lastTime, housing_thermo->readCelsius());
+    snprintf(buf2, MAX_BUF, MQTT_TOPIC_HOUSING_TEMP_FMT, kiln_thermo->lastTime(), housing_thermo->readCelsius());
     mqtt_cli->publish(buf1, buf2);
     //Serial.print("kiln C = "); 
     //Serial.print(kiln_thermo->readCelsius());
