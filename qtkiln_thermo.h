@@ -22,8 +22,8 @@ class QTKilnThermo
     unsigned long _lastTime = 0;	// the last time the system was updated
     bool _enabled = false;		// is the system running
     float _lastTempC = .0;		// last temperature reading in C
-    float _readCelsius(void);		// return the temperature in C
     float (*_read_fptr)(void) = NULL;	// underlying thermocouple read function ptr
+    void _doRead(void);			// do the read via the phy
 };
 
 #endif

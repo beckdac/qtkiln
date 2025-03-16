@@ -163,7 +163,11 @@ void setup() {
 
   // do first thermocouple reading
   kiln_thermo = new QTKilnThermo(config.thermo_update_int_ms, &kiln_readCelsius);
+  kiln_thermo->begin();
+  kiln_thermo->enable();
   housing_thermo = new QTKilnThermo(config.thermo_update_int_ms, &housing_readCelsius);
+  housing_thermo->begin();
+  housing_thermo->enable();
 }
 
 // state or preallocated variables for loop

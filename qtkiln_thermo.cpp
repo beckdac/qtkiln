@@ -12,6 +12,7 @@ void QTKilnThermo::begin(void) {
 
 void QTKilnThermo::enable(void) {
   _enabled = true;
+  _doRead();
 }
 
 void QTKilnThermo::disable(void) {
@@ -35,11 +36,14 @@ float QTKilnThermo::readCelsius(void) {
   return _lastTempC;
 }
 
+float QTKilnThermo::_doRead(void) {
+  _lastTempC = (_read_fptr ? _read_fptr() : -1);
+  _lastTime = millis();
+}
+
 void QTKilnThermo::loop(void) {
   unsigned long now = millis();
 
-  if ((now - _lastTime) >= _interval_ms && _enabled) {
-    _lastTempC = (_read_fptr ? _read_fptr() : -1);
-    _lastTime = millis();
-  }
+  if ((now - _lastTime) >= _interval_ms && _enabled)
+    _doRead();
 }
