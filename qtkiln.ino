@@ -155,8 +155,8 @@ void setup() {
   mqtt_cli->enableHTTPWebUpdater("/");
 
   // do first thermocouple reading
-  kiln_thermo = new QTKilnThermo(config.thermo_update_int_ms, &kiln_thermocouple.readCelsius());
-  housing_thermo = new QTKilnThermo(config.thermo_update_int_ms, &housing_thermocouple.readCelsius());
+  kiln_thermo = new QTKilnThermo(config.thermo_update_int_ms, &kiln_thermocouple.readCelsius);
+  housing_thermo = new QTKilnThermo(config.thermo_update_int_ms, &housing_thermocouple.readCelsius);
 }
 
 // state or preallocated variables for loop
