@@ -30,6 +30,8 @@ struct config {
   char topic[MAX_CFG_STR];
   uint16_t update_interval_ms;
 } config;
+#define MIN_THERMO_UPDATE_MS 250
+#define MAX_THERMO_UPDATE_MS 5000
 
 // state variables are found above the loop function
 
@@ -70,9 +72,17 @@ void setup() {
 	topic_base, config.mac);
 
   // check some config variables against mins
-  if (config.update_interval_ms < 250) {
-    Serial.println("MAX6675 update interval must be > 250 ms, forcing to 250 ms");
-    config.update_interval_ms = 250;
+  if (config.update_interval_ms < MIN_THERMO_UPDATE_MS) {
+    Serial.print("thermocouple update interval must be > ");
+    Serial.print(MIN_THERMO_UPDATE_MS);
+    Serial.println(" ms ... forcing to min");
+    config.update_interval_ms = MIN_THERMO_UPDATE_MS;
+  }
+  if (config.update_interval_ms > MAX_THERMO_UPDATE_MS) {
+    Serial.print("thermocouple update interval must be < ");
+    Serial.print(MAX_THERMO_UPDATE_MS);
+    Serial.println(" ms ... forcing to max");
+    config.update_interval_ms = MAX_THERMO_UPDATE_MS;
   }
 
   // do first thermocouple reading
