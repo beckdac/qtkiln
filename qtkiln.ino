@@ -1,7 +1,7 @@
 #include <WiFi.h>
 #include <esp_wifi.h>
-#include "Arduino.h"
-#include "max6675.h"
+#include <Arduino.h>
+#include <max6675.h>
 
 // thermocouple phy
 const unsigned int MAXDO = 5;
@@ -24,15 +24,18 @@ const char *mqtt_password = "hotashell";
 const int mqtt_port = 1883;
 
 // configuration
+#define MAX_CFG_STR 24
 struct config {
-  char mac[24] = "c0:ff:ee:ca:fe:42";
-  char topic[24];
+  char mac[MAX_CFG_STR] = "c0:ff:ee:ca:fe:42";
+  char topic[MAX_CFG_STR];
   uint16_t sample_kiln_ms;
   uint16_t sample_housing_ms;
 } config;
 
-// state variables
-float kiln_temperature, housing_temperature;
+// state variables are found above the loop function
+
+// prototypes
+void thermocouple_update(boolean kiln, boolean housing);
 
 // initialize the hardware and provide for any startup
 // delays according to manufacturer data sheets
@@ -42,8 +45,8 @@ void setup() {
   // wait for MAX chip to stabilize
   delay(500);
 
-  // initialize the serial for 9600 baud
-  Serial.begin(9600);
+  // initialize the serial for 115200 baud
+  Serial.begin(115200);
 
   // connect to wifi
   WiFi.begin(ssid, sspw);
@@ -52,26 +55,62 @@ void setup() {
   }
 
   // setup the config structure
-  esp_err_t ret = esp_wifi_get_mac(WIFI_IF_STA, baseMac);
+
+  // get the mac
+  esp_err_t ret = esp_wifi_get_mac(WIFI_IF_STA, u8mac);
   if (ret == ESP_OK) {
-    snprintf(config.mac, 24, 
-		  "%02x:%02x:%02x:%02x:%02x:%02x",
-                  baseMac[0], baseMac[1], baseMac[2],
-                  baseMac[3], baseMac[4], baseMac[5]);
+    snprintf(config.mac, MAX_CFG_STR, 
+      "%02x:%02x:%02x:%02x:%02x:%02x",
+	u8mac[0], u8mac[1], u8mac[2],
+	u8mac[3], u8mac[4], u8mac[5]);
   } else {
     Serial.println("failed to read MAC address");
   }
+  // setup the topic based on the mac
+  snprintf(config.topic, MAX_CFG_STR, "%s/%s",
+	topic_base, config.mac);
+
+  // check some config variables against mins
+  if (config.update_interval_ms < 250) {
+    Serial.println("MAX6675 update interval must be > 250 ms, forcing to 250 ms");
+    config.update_interval_ms = 250;
+  }
+
+  // do first thermocouple reading
+  thermocouple_update(true, true);
 }
 
+void thermocouple_update(boolean kiln, boolean housing) {
+  if (kiln)
+    kiln_temperature = kiln_thermocouple.readCelsius();
+  if (housing)
+    housing_temperature = housing_thermocouple.readCelsius();
+  last_time = millis();
+}
+
+// state variables associated with the loop
+float kiln_temperature, housing_temperature;
+unsigned long last_time, now, delta_t;
+uint16_t loop_time;
+
 void loop() {
-  kiln_temperature = kiln_thermocouple.readCelsius();
-  housing_temperature = housing_thermocouple.readCelsius();
+  now = millis();
+  delta_t = now - last_time;
+  if (delta_t >= config.update_interval_ms) {
+    thermocouple_update(true, true);
+  }
+
   Serial.print("kiln C = "); 
   Serial.print(kiln_temperature);
   Serial.print(" housing C = ");
   Serial.println(housing_temperature);
-  
-  // For the MAX6675 to update, you must delay AT LEAST 250ms between reads!
-  delay(250);
+
+  // how long did it take us to update the thermos
+  // and run the rest of the main loop
+  now = millis();
+  loop_time = (uint16_t)((now-last_time)-delta_t);
+  // now delay the update interval minimum time
+  Serial.println(config.update_interval_ms - (now-last_time));
+  delay(config.update_interval_ms - (now-last_time));
 }
 
