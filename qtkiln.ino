@@ -3,8 +3,8 @@
 #include <Arduino.h>
 #include <Preferences.h>
 
+#include <PID_v2.h>
 #include <max6675.h>
-#include <SlowPWM.h>
 #include <EspMQTTClient.h>
 
 #include "qtkiln_thermo.h"
@@ -49,9 +49,15 @@ EspMQTTClient *mqtt_cli = NULL;
 
 // PWM object
 #define SSR_PIN 8
-S_PWM *pwm = NULL;
+unsigned long pwm_last_time = 0;
+
+// PID object
+PID_v2 *pid = NULL;
 
 // configuration
+#define PRFS_KI "initial_Ki"
+#define PRFS_KP "initial_Kp"
+#define PRFS_KD "initial_Kd"
 #define PRFS_THRM_UPD_INT_MS_FMT "thrm_upd_int_ms"
 #define PRFS_PWM_UPD_INT_MS_FMT "pwm_upd_int_ms"
 #define PRFS_MQTT_UPD_INT_MS_FMT "mqtt_upd_int_ms"
@@ -76,9 +82,12 @@ struct config {
 // state variables are found above the loop function
 
 // prototypes
-void set_thermo_update_int_ms(uint16_t thermo_update_int_ms, bool update_prefs);
-void set_pwm_update_int_ms(uint16_t pwm_update_int_ms, bool update_prefs);
-void set_mqtt_update_int_ms(uint16_t mqtt_update_int_ms, bool update_prefs);
+void config_set_thermo_update_int_ms(uint16_t thermo_update_int_ms, bool update_prefs);
+void config_set_pwm_update_int_ms(uint16_t pwm_update_int_ms, bool update_prefs);
+void config_set_mqtt_update_int_ms(uint16_t mqtt_update_int_ms, bool update_prefs);
+void config_set_pid.Ki(double Ki, bool update_prefs);
+void config_set_pid.Kd(double Kd, bool update_prefs);
+void config_set_pid.Kp(double Kp, bool update_prefs);
 void onConnectionEstablished(void);
 void onConfigMessageReceived(const String &message);
 void onStateSetMessageReceived(const String &message);
@@ -124,19 +133,26 @@ void setup() {
   Serial.print("topic root for this device is ");
   Serial.println(config.topic);
 
-  // check some config variables against mins
-  set_thermo_update_int_ms(
-     preferences.getUInt(PRFS_THRM_UPD_INT_MS_FMT, MIN_THERMO_UPDATE_MS), false);
-  set_pwm_update_int_ms(
-     preferences.getUInt(PRFS_PWM_UPD_INT_MS_FMT, MIN_PWM_UPDATE_MS), false);
-  set_mqtt_update_int_ms(
-     preferences.getUInt(PRFS_MQTT_UPD_INT_MS_FMT, MIN_MQTT_UPDATE_MS), false);
+  // set the variables from defaults and init pieces
+  config_set_thermo_update_int_ms(
+     preferences.getUShort(PRFS_THRM_UPD_INT_MS, MIN_THERMO_UPDATE_MS), false);
+  config_set_pwm_update_int_ms(
+     preferences.getUShort(PRFS_PWM_UPD_INT_MS, MIN_PWM_UPDATE_MS), false);
+  config_set_mqtt_update_int_ms(
+     preferences.getUShort(PRFS_MQTT_UPD_INT_MS, MIN_MQTT_UPDATE_MS), false);
+  config_set_init_pid_Kp(preferences.getDouble(PRFS_KP, PID_KP), false);
+  config_set_init_pid_Kd(preferences.getDouble(PRFS_KD, PID_KD), false);
+  config_set_init_pid_Ki(preferences.getDouble(PRFS_KI, PID_KI), false);
 
   // setup PWM
-  pwm = new S_PWM(SSR_PIN, config.pwm_update_int_ms);
-  pwm->setDuty(0); // force duty cycle to 0
-  pwm->begin();
-  Serial.println("PWM is running");
+  pinMode(SSR_PIN, OUTPUT);
+  Serial.print("PWM cycle window in ms is ");
+  Serial.println(config.pwm_update_int_ms);
+  pwm_last_time = millis();
+
+  // setup PID
+  pid = new PID_v2(config.Kp, config.Ki, config.Kd, PID::Direct);
+  pid->SetOutputLimits(0, config.pwm_update_int_ms);
 
   // start the mqtt client
   mqtt_cli = new EspMQTTClient(WIFI_SSID, WIFI_PASS, MQTT_BROKER,
@@ -192,7 +208,7 @@ void loop() {
 }
 
 // set configuration variables after checking them
-void set_thermo_update_int_ms(uint16_t thermo_update_int_ms, bool update_prefs) {
+void config_set_thermo_update_int_ms(uint16_t thermo_update_int_ms, bool update_prefs) {
   if (thermo_update_int_ms < MIN_THERMO_UPDATE_MS) {
     Serial.print("thermocouple update interval must be > ");
     Serial.print(MIN_THERMO_UPDATE_MS);
@@ -209,9 +225,9 @@ void set_thermo_update_int_ms(uint16_t thermo_update_int_ms, bool update_prefs) 
   Serial.print("thermocouple update interval (ms) = ");
   Serial.println(config.thermo_update_int_ms);
   if (update_prefs)
-     preferences.putUInt(PRFS_THRM_UPD_INT_MS_FMT, config.thermo_update_int_ms);
+     preferences.putUInt(PRFS_THRM_UPD_INT_MS, config.thermo_update_int_ms);
 }
-void set_pwm_update_int_ms(uint16_t pwm_update_int_ms, bool update_prefs) {
+void config_set_pwm_update_int_ms(uint16_t pwm_update_int_ms, bool update_prefs) {
   if (pwm_update_int_ms < MIN_PWM_UPDATE_MS) {
     Serial.print("PWM update interval must be > ");
     Serial.print(MIN_PWM_UPDATE_MS);
@@ -228,9 +244,9 @@ void set_pwm_update_int_ms(uint16_t pwm_update_int_ms, bool update_prefs) {
   Serial.print("PWM update interval (ms) = ");
   Serial.println(config.pwm_update_int_ms);
   if (update_prefs)
-     preferences.putUInt(PRFS_PWM_UPD_INT_MS_FMT, config.pwm_update_int_ms);
+     preferences.putUInt(PRFS_PWM_UPD_INT_MS, config.pwm_update_int_ms);
 }
-void set_mqtt_update_int_ms(uint16_t mqtt_update_int_ms, bool update_prefs) {
+void config_set_mqtt_update_int_ms(uint16_t mqtt_update_int_ms, bool update_prefs) {
   if (mqtt_update_int_ms < MIN_MQTT_UPDATE_MS) {
     Serial.print("mqtt update interval must be > ");
     Serial.print(MIN_MQTT_UPDATE_MS);
@@ -247,7 +263,22 @@ void set_mqtt_update_int_ms(uint16_t mqtt_update_int_ms, bool update_prefs) {
   Serial.print("mqtt update interval (ms) = ");
   Serial.println(config.mqtt_update_int_ms);
   if (update_prefs)
-     preferences.putUInt(PRFS_MQTT_UPD_INT_MS_FMT, config.mqtt_update_int_ms);
+     preferences.putUInt(PRFS_MQTT_UPD_INT_MS, config.mqtt_update_int_ms);
+}
+void config_set_init_pid_Kp(double Kp, bool update_prefs) {
+  config.Kp = Kp;
+  if (update_prefs)
+     preferences.putDouble(PRFS_PID_KP, config.Kp);
+}
+void config_set_init_pid_Ki(double Ki, bool update_prefs) {
+  config.Ki = Ki;
+  if (update_prefs)
+     preferences.putDouble(PRFS_PID_KI, config.Ki);
+}
+void config_set_init_pid_Kd(double Kd, bool update_prefs) {
+  config.Kd = Kd;
+  if (update_prefs)
+     preferences.putDouble(PRFS_PID_KD, config.Kd);
 }
 
 
