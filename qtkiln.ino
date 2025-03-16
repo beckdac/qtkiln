@@ -76,7 +76,9 @@ struct config {
 // state variables are found above the loop function
 
 // prototypes
-void thermocouple_update(void);
+void set_thermo_update_int_ms(uint16_t thermo_update_int_ms, bool update_prefs);
+void set_pwm_update_int_ms(uint16_t pwm_update_int_ms, bool update_prefs);
+void set_mqtt_update_int_ms(uint16_t mqtt_update_int_ms, bool update_prefs);
 void onConnectionEstablished(void);
 void onConfigMessageReceived(const String &message);
 void onStateSetMessageReceived(const String &message);
@@ -124,11 +126,11 @@ void setup() {
 
   // check some config variables against mins
   set_thermo_update_int_ms(
-     preferences.getUInt(PRFS_THRM_UPD_INT_MS_FMT, MIN_THERMO_UPDATE_MS));
+     preferences.getUInt(PRFS_THRM_UPD_INT_MS_FMT, MIN_THERMO_UPDATE_MS), false);
   set_pwm_update_int_ms(
-     preferences.getUInt(PRFS_PWM_UPD_INT_MS_FMT, MIN_PWM_UPDATE_MS));
+     preferences.getUInt(PRFS_PWM_UPD_INT_MS_FMT, MIN_PWM_UPDATE_MS), false);
   set_mqtt_update_int_ms(
-     preferences.getUInt(PRFS_MQTT_UPD_INT_MS_FMT, MIN_MQTT_UPDATE_MS));
+     preferences.getUInt(PRFS_MQTT_UPD_INT_MS_FMT, MIN_MQTT_UPDATE_MS), false);
 
   // setup PWM
   pwm = new S_PWM(SSR_PIN, config.pwm_update_int_ms);
@@ -186,7 +188,7 @@ void loop() {
 }
 
 // set configuration variables after checking them
-void set_thermo_update_int_ms(uint16_t thermo_update_int_ms) {
+void set_thermo_update_int_ms(uint16_t thermo_update_int_ms, bool update_prefs) {
   if (thermo_update_int_ms < MIN_THERMO_UPDATE_MS) {
     Serial.print("thermocouple update interval must be > ");
     Serial.print(MIN_THERMO_UPDATE_MS);
@@ -202,8 +204,10 @@ void set_thermo_update_int_ms(uint16_t thermo_update_int_ms) {
   config.thermo_update_int_ms = thermo_update_int_ms;
   Serial.print("thermocouple update interval (ms) = ");
   Serial.println(config.thermo_update_int_ms);
+  if (update_prefs)
+     preferences.putUInt(PRFS_THRM_UPD_INT_MS_FMT, config.thermo_update_int_ms);
 }
-void set_pwm_update_int_ms(uint16_t pwm_update_int_ms) {
+void set_pwm_update_int_ms(uint16_t pwm_update_int_ms, bool update_prefs) {
   if (pwm_update_int_ms < MIN_PWM_UPDATE_MS) {
     Serial.print("PWM update interval must be > ");
     Serial.print(MIN_PWM_UPDATE_MS);
@@ -219,8 +223,10 @@ void set_pwm_update_int_ms(uint16_t pwm_update_int_ms) {
   config.pwm_update_int_ms = pwm_update_int_ms;
   Serial.print("PWM update interval (ms) = ");
   Serial.println(config.pwm_update_int_ms);
+  if (update_prefs)
+     preferences.putUInt(PRFS_PWM_UPD_INT_MS_FMT, config.pwm_update_int_ms);
 }
-void set_mqtt_update_int_ms(uint16_t mqtt_update_int_ms) {
+void set_mqtt_update_int_ms(uint16_t mqtt_update_int_ms, bool update_prefs) {
   if (mqtt_update_int_ms < MIN_MQTT_UPDATE_MS) {
     Serial.print("mqtt update interval must be > ");
     Serial.print(MIN_MQTT_UPDATE_MS);
@@ -236,11 +242,41 @@ void set_mqtt_update_int_ms(uint16_t mqtt_update_int_ms) {
   config.mqtt_update_int_ms = mqtt_update_int_ms;
   Serial.print("mqtt update interval (ms) = ");
   Serial.println(config.mqtt_update_int_ms);
+  if (update_prefs)
+     preferences.putUInt(PRFS_MQTT_UPD_INT_MS_FMT, config.mqtt_update_int_ms);
 }
 
 
 // handle mqtt config messages
+#define MAX_MSG_BUF 256
 void onConfigMessageReceived(const String &message) {
+  bool config_updated = false;
+  char msg[MAX_MSG_BUF];
+  message.toCharArray(msg, MAX_MSG_BUF);
+
+  // the format should be key=value so if no = found, bad msg
+  char *eqptr = strchr(msg, '=');
+  if (eqptr) {
+    char *valptr = eqptr+1;
+    unsigned long val;
+    *eqptr = NULL;
+    if (strcmp(msg, PRFS_THRM_UPD_INT_MS_FMT) == 0) {
+      val = strtoul(valptr, NULL, 0);
+      set_thermo_update_int_ms(val, true);
+      config_updated = true;
+    } else if (strcmp(msg, PRFS_PWM_UPD_INT_MS_FMT) == 0) {
+      val = strtoul(valptr, NULL, 0);
+      set_pwm_update_int_ms(val, true);
+      config_updated = true;
+    } else if (strcmp(msg, PRFS_MQTT_UPD_INT_MS_FMT) == 0) {
+      val = strtoul(valptr, NULL, 0);
+      set_mqtt_update_int_ms(val, true);
+      config_updated = true;
+    }
+  }
+
+  if (config_update)
+    esp_restart();
 }
 
 // handle mqtt state messages
