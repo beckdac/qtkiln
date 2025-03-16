@@ -21,10 +21,11 @@ const char *sspw = WIFI_PASS;
 // MQTT server
 #define MQTT_MAX_TOPIC_STR 256
 #define MQTT_TOPIC_BASE "qtkiln"
-#define MQTT_TOPIC_FMT "qtkiln/%s"
+#define MQTT_TOPIC_FMT "%s/%s"
 #define MQTT_SUBTOPIC_CFG_FMT "%s/config"
 #define MQTT_SUBTOPIC_SET_FMT "%s/get"
 #define MQTT_SUBTOPIC_GET_FMT "%s/set"
+#define MQTT_ON_CONN_MSG "connected"
 #include "mqtt_cred.h"
 EspMQTTClient *mqtt_cli = NULL;
 
@@ -85,8 +86,8 @@ void setup() {
     Serial.println("failed to read MAC address");
   }
   // setup the topic based on the mac
-  snprintf(config.topic, MAX_CFG_STR, "%s/%s",
-	TOPIC_BASE, config.mac);
+  snprintf(config.topic, MAX_CFG_STR, MQTT_TOPIC_FMT,
+	MQTT_TOPIC_BASE, config.mac);
 
   // check some config variables against mins
   if (config.thermo_update_int_ms < MIN_THERMO_UPDATE_MS) {
@@ -172,12 +173,15 @@ void onGetStateMessageReceived(const String &message) {
 
 // when the connection to the mqtt has completed
 void onConnectionEstablished(void) {
-  char *buf[MAX_TOPIC_STR];
-  snprintf(buf, MAX_TOPIC_STR, MQTT_SUBTOPIC_CFG_FMT, config.topic);
-  mqtt_cli.subscribe(
-"mytopic/test", [] (const String &payload)  {
-    Serial.println(payload);
-  });
+  char topic[MQTT_MAX_TOPIC_STR];
 
-  mqtt_cli.publish("mytopic/test", "This is a message");
+  snprintf(topic, MQTT_MAX_TOPIC_STR, MQTT_SUBTOPIC_CFG_FMT, config.topic);
+  mqtt_cli->subscribe(topic, onConfigMessageReceived);
+
+  snprintf(topic, MQTT_MAX_TOPIC_STR, MQTT_SUBTOPIC_GET_FMT, config.topic);
+  mqtt_cli->subscribe(topic, onGetStateMessageReceived);
+  snprintf(topic, MQTT_MAX_TOPIC_STR, MQTT_SUBTOPIC_SET_FMT, config.topic);
+  mqtt_cli->subscribe(topic, onSetStateMessageReceived);
+
+  mqtt_cli->publish(config.topic, MQTT_ON_CONN_MSG);
 }
