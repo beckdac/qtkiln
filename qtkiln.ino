@@ -41,8 +41,8 @@ const char *sspw = WIFI_PASS;
 #define MQTT_TOPIC_HOUSING_FMT "%s/housing"
 #define MQTT_TOPIC_HOUSING_TEMP_FMT "%lu %0.2f"
 #define MQTT_SUBTOPIC_CFG_FMT "%s/config"
-#define MQTT_SUBTOPIC_SET_FMT "%s/get"
-#define MQTT_SUBTOPIC_GET_FMT "%s/set"
+#define MQTT_SUBTOPIC_GET_FMT "%s/get"
+#define MQTT_SUBTOPIC_SET_FMT "%s/set"
 #define MQTT_ON_CONN_MSG "connected"
 #include "mqtt_cred.h"
 EspMQTTClient *mqtt_cli = NULL;
@@ -164,6 +164,15 @@ unsigned long last_time = 0, now, delta_t;
 #define MAX_BUF 256
 char buf1[MAX_BUF], buf2[MAX_BUF];
 
+void mqtt_publish_temps(void) {
+    snprintf(buf1, MAX_BUF, MQTT_TOPIC_KILN_FMT, config.topic);
+    snprintf(buf2, MAX_BUF, MQTT_TOPIC_KILN_TEMP_FMT, kiln_thermo->lastTime(), kiln_thermo->readCelsius());
+    mqtt_cli->publish(buf1, buf2);
+    snprintf(buf1, MAX_BUF, MQTT_TOPIC_HOUSING_FMT, config.topic);
+    snprintf(buf2, MAX_BUF, MQTT_TOPIC_HOUSING_TEMP_FMT, kiln_thermo->lastTime(), housing_thermo->readCelsius());
+    mqtt_cli->publish(buf1, buf2);
+}
+
 void loop() {
   // run handlers for subprocesses
   pwm->pwmLoop();
@@ -175,12 +184,7 @@ void loop() {
   delta_t = now - last_time;
   // if we have waited long enough, update the thermos
   if (delta_t >= config.mqtt_update_int_ms) {
-    snprintf(buf1, MAX_BUF, MQTT_TOPIC_KILN_FMT, config.topic);
-    snprintf(buf2, MAX_BUF, MQTT_TOPIC_KILN_TEMP_FMT, kiln_thermo->lastTime(), kiln_thermo->readCelsius());
-    mqtt_cli->publish(buf1, buf2);
-    snprintf(buf1, MAX_BUF, MQTT_TOPIC_HOUSING_FMT, config.topic);
-    snprintf(buf2, MAX_BUF, MQTT_TOPIC_HOUSING_TEMP_FMT, kiln_thermo->lastTime(), housing_thermo->readCelsius());
-    mqtt_cli->publish(buf1, buf2);
+    mqtt_publish_temps();
     last_time = millis();
   }
   // do a minimal delay for the PWM and other service loops
@@ -281,10 +285,35 @@ void onConfigMessageReceived(const String &message) {
   }
 }
 
+#define MQTT_TARGET_TEMP_SET_MSG "target_temperature_C"
+#define MQTT_TEMP_GET_MSG "temperature_C"
 // handle mqtt state messages
 void onSetStateMessageReceived(const String &message) {
+  char msg[MAX_MSG_BUF];
+  message.toCharArray(msg, MAX_MSG_BUF);
+
+  // the format should be key=value so if no = found, bad msg
+  char *eqptr = strchr(msg, '=');
+  if (eqptr) {
+    char *valptr = eqptr+1;
+    unsigned long val;
+    *eqptr = NULL;
+    if (strcmp(msg, MQTT_TARGET_TEMP_SET_MSG) == 0) {
+      val = strtoul(valptr, NULL, 0);
+      Serial.print("target temperature set via mqtt to (C) ");
+      Serial.println(val);
+      //set_target_temperature_C(val);
+    }
+  }
 }
 void onGetStateMessageReceived(const String &message) {
+  char msg[MAX_MSG_BUF];
+  message.toCharArray(msg, MAX_MSG_BUF);
+
+  // the format should be key=value so if no = found, bad msg
+  if (strcmp(msg, MQTT_TEMP_GET_MSG) == 0) {
+    mqtt_publish_temps();
+  }
 }
 
 // when the connection to the mqtt has completed
