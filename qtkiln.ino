@@ -6,6 +6,7 @@
 #include <PID_v2.h>
 #include <max6675.h>
 #include <EspMQTTClient.h>
+#include <TM1637Display.h>
 
 #include "qtkiln_thermo.h"
 
@@ -72,6 +73,19 @@ unsigned long pid_output = 0;
 #define MIN_TARGET_TEMP 0
 #define MAX_TARGET_TEMP 1100
 
+// LCD
+#define LCD_CLK 1
+#define LCD_DIO 0
+TM1637Display lcd(LCD_CLK, LCD_DIO);
+const uint8_t LCD_BOOT[] = {
+  SEG_C | SEG_D | SEG_E | SEG_F | SEG_G,          // b
+  SEG_C | SEG_D | SEG_E | SEG_G,                  // o
+  SEG_C | SEG_D | SEG_E | SEG_G,                  // o
+  SEG_D | SEG_E | SEG_F | SEG_G      		  // t
+};
+uint8_t lcd_val = 0;
+bool dots[4] = { false, false, false, false };
+
 // configuration
 #define PRFS_PID_KI "initial_Ki"
 #define PRFS_PID_KP "initial_Kp"
@@ -111,11 +125,16 @@ void onConnectionEstablished(void);
 void onConfigMessageReceived(const String &message);
 void onStateSetMessageReceived(const String &message);
 void onStateSetMessageReceived(const String &message);
+void lcd_update(uint16_t val, bool dots[4]);
 
 // initialize the hardware and provide for any startup
 // delays according to manufacturer data sheets
 void setup() {
   uint8_t u8mac[6];
+
+  // lcd setup
+  lcd.setBrightness(0x04);
+  lcd.setSegments(LCD_BOOT);
 
   // load up the preferences so we can overwrite
   // the config defaults
@@ -196,6 +215,15 @@ void setup() {
   Serial.print(kiln_thermo->readCelsius());
   Serial.print(" housing C = ");
   Serial.println(housing_thermo->readCelsius());
+
+  // lcd setup
+  lcd.setBrightness(0x0f);
+  bool dots[4] = { true, false, true, false };
+  lcd_update(kiln_thermo->readCelsius(), dots);
+}
+
+void lcd_update(uint16_t val, bool dots[4]) {
+  lcd.showNumberDecEx(kiln_thermo->readCelsius(), (0b1 & dots[0] | 0b01 & dots[1] | 0b001 & dots[2]));
 }
 
 // state or preallocated variables for loop
