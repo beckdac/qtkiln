@@ -62,6 +62,10 @@ PID_v2 *pid = NULL;
 #define PID_KI 0.2
 #define PID_KD 0.1
 boolean pid_enabled = false;
+uint16_t target_temperature_C = 0;
+unsigned long pid_output = 0;
+#define MIN_TARGET_TEMP 0
+#define MAX_TARGET_TEMP 1100
 
 // configuration
 #define PRFS_PID_KI "initial_Ki"
@@ -166,6 +170,7 @@ void setup() {
   // setup PID
   pid = new PID_v2(config.Kp, config.Ki, config.Kd, PID::Direct);
   pid->SetOutputLimits(0, config.pwm_update_int_ms);
+  
 
   // start the mqtt client
   mqtt_cli = new EspMQTTClient(WIFI_SSID, WIFI_PASS, MQTT_BROKER,
@@ -201,7 +206,6 @@ void mqtt_publish_temps(void) {
     snprintf(buf2, MAX_BUF, MQTT_HOUSING_TEMP_FMT, kiln_thermo->lastTime(), housing_thermo->readCelsius());
     mqtt_cli->publish(buf1, buf2);
 }
-
 void mqtt_publish_pid_enabled(void) {
     snprintf(buf1, MAX_BUF, MQTT_TOPIC_PID_ENABLED_FMT, config.topic);
     snprintf(buf2, MAX_BUF, MQTT_PID_ENABLED_FMT, pid_enabled);
@@ -214,19 +218,31 @@ void mqtt_publish_pid_settings(void) {
     snprintf(buf2, MAX_BUF, MQTT_PID_SETTINGS_FMT, Kp, Ki, Kd);
     mqtt_cli->publish(buf1, buf2);
 }
+void mqtt_publish_duty_cycle(void){
+    double duty_cycle = (double)pid_output / (double)config.pwm_update_int_ms;
+#define MQTT_TOPIC_DUTY_CYCLE_FMT "%s/duty_cycle"
+#define MQTT_DUTY_CYCLE_FMT "%g"
+    snprintf(buf1, MAX_BUF, MQTT_TOPIC_DUTY_CYCLE_FMT, config.topic);
+    snprintf(buf2, MAX_BUF, MQTT_DUTY_CYCLE_FMT, duty_cycle);
+    mqtt_cli->publish(buf1, buf2);
+}
 
 bool ssr_state = false;
 void ssr_on(void) {
   if (ssr_state)
     return;
-  Serial.println("turning on SSR");
+  Serial.print("SSR ");
+  Serial.print(millis());
+  Serial.println(" on");
   ssr_state = true;
   digitalWrite(SSR_PIN, HIGH);
 }
 
 void ssr_off(void) {
   if (ssr_state) {
-    Serial.println("turning off SSR");
+    Serial.print("SSR ");
+    Serial.print(millis());
+    Serial.println(" off");
     ssr_state = false;
     digitalWrite(SSR_PIN, LOW);
   }
@@ -235,13 +251,18 @@ void ssr_off(void) {
 void loop() {
   now = millis();
   if (pid_enabled) {
+    // shift the next start time into the future
     while (now - pwm_window_start_time > config.pwm_update_int_ms) {
       pwm_window_start_time += config.pwm_update_int_ms;
+      Serial.println("recentering the timer");
     }
-    if (pid->Run(kiln_thermo->readCelsius()) < now - pwm_window_start_time)
+    Serial.println("updating pid");
+    pid_output = pid->Run(kiln_thermo->readCelsius());
+    if (pid_output < now - pwm_window_start_time)
       ssr_on();
     else
       ssr_off();
+    mqtt_publish_duty_cycle();
   }
 
   // run handlers for subprocesses
@@ -405,13 +426,30 @@ void onSetStateMessageReceived(const String &message) {
     *eqptr = NULL;
     if (strcmp(msg, MQTT_SET_MSG_TARGET_TEMP) == 0) {
       unsigned long val = strtoul(valptr, NULL, 0);
+      if (val < MIN_TARGET_TEMP) {
+        val = MIN_TARGET_TEMP;
+      } else if (val > MAX_TARGET_TEMP) {
+        val = MAX_TARGET_TEMP;
+      }
       Serial.print("target temperature set via mqtt to (C) ");
       Serial.println(val);
-      //set_target_temperature_C(val);
+      target_temperature_C = val;
+      pid->Setpoint(target_temperature_C);
     } else if (strcmp(msg, MQTT_SET_MSG_PID_ENABLED) == 0) {
       bool val = strtoul(valptr, NULL, 0);
       Serial.print("pid enabled is set to ");
       Serial.println(val);
+      if (!pid_enabled && val) {
+        // turning on
+        Serial.print("pid turning on with target temperature of (C) ");
+	Serial.println(target_temperature_C);
+        pid->Start(kiln_thermo->readCelsius(), 0, target_temperature_C);
+      } else if (pid_enabled && !val) {
+        // turning off
+        Serial.println("pid turning off");
+        ssr_off();
+      }
+      pid_enabled=val;
     } else if (strcmp(msg, MQTT_SET_MSG_PID_SETTINGS) == 0) {
       double Kp, Ki, Kd;
       uint8_t parsed = sscanf(valptr, MQTT_SET_MSG_PID_SETTINGS_FMT, &Kp, &Ki, &Kd);
