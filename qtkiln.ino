@@ -52,7 +52,7 @@ const char *sspw = WIFI_PASS;
 #define MQTT_DUTY_CYCLE_FMT "%g"
 #define MQTT_GET_MSG_DUTY_CYCLE "duty_cycle"
 #define MQTT_TOPIC_TARGET_TEMP_FMT "%s/target_temperature_C"
-#define MQTT_TARGET_TEMP_FMT "%g"
+#define MQTT_TARGET_TEMP_FMT "%lu"
 #define MQTT_ON_CONN_MSG "connected"
 #include "mqtt_cred.h"
 EspMQTTClient *mqtt_cli = NULL;
