@@ -219,11 +219,13 @@ void setup() {
   // lcd setup
   lcd.setBrightness(0x0f);
   bool dots[4] = { true, false, true, false };
-  lcd_update(kiln_thermo->readCelsius(), dots);
+  // 0.5 is for rounding up
+  lcd_update(kiln_thermo->readCelsius() + 0.5, dots);
 }
 
 void lcd_update(uint16_t val, bool dots[4]) {
-  lcd.showNumberDecEx(kiln_thermo->readCelsius(), (0b1 & dots[0] | 0b01 & dots[1] | 0b001 & dots[2]));
+  lvd_val = val;
+  lcd.showNumberDecEx(val, (0b1 & dots[0] | 0b01 & dots[1] | 0b001 & dots[2]));
 }
 
 // state or preallocated variables for loop
