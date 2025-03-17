@@ -224,7 +224,7 @@ void mqtt_publish_pid_settings(void) {
     mqtt_cli->publish(buf1, buf2);
 }
 void mqtt_publish_duty_cycle(void) {
-    double duty_cycle = (double)pid_output / (double)config.pwm_update_int_ms;
+    double duty_cycle = 100. * (double)pid_output / (double)config.pwm_update_int_ms;
     snprintf(buf1, MAX_BUF, MQTT_TOPIC_DUTY_CYCLE_FMT, config.topic);
     snprintf(buf2, MAX_BUF, MQTT_DUTY_CYCLE_FMT, duty_cycle);
     mqtt_cli->publish(buf1, buf2);
