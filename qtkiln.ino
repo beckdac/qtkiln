@@ -48,6 +48,9 @@ const char *sspw = WIFI_PASS;
 #define MQTT_SUBTOPIC_CFG_FMT "%s/config"
 #define MQTT_SUBTOPIC_GET_FMT "%s/get"
 #define MQTT_SUBTOPIC_SET_FMT "%s/set"
+#define MQTT_TOPIC_DUTY_CYCLE_FMT "%s/duty_cycle"
+#define MQTT_DUTY_CYCLE_FMT "%g"
+#define MQTT_GET_MSG_DUTY_CYCLE "duty_cycle"
 #define MQTT_ON_CONN_MSG "connected"
 #include "mqtt_cred.h"
 EspMQTTClient *mqtt_cli = NULL;
@@ -220,8 +223,6 @@ void mqtt_publish_pid_settings(void) {
 }
 void mqtt_publish_duty_cycle(void){
     double duty_cycle = (double)pid_output / (double)config.pwm_update_int_ms;
-#define MQTT_TOPIC_DUTY_CYCLE_FMT "%s/duty_cycle"
-#define MQTT_DUTY_CYCLE_FMT "%g"
     snprintf(buf1, MAX_BUF, MQTT_TOPIC_DUTY_CYCLE_FMT, config.topic);
     snprintf(buf2, MAX_BUF, MQTT_DUTY_CYCLE_FMT, duty_cycle);
     mqtt_cli->publish(buf1, buf2);
@@ -254,15 +255,12 @@ void loop() {
     // shift the next start time into the future
     while (now - pwm_window_start_time > config.pwm_update_int_ms) {
       pwm_window_start_time += config.pwm_update_int_ms;
-      Serial.println("recentering the timer");
     }
-    Serial.println("updating pid");
     pid_output = pid->Run(kiln_thermo->readCelsius());
-    if (pid_output < now - pwm_window_start_time)
+    if (now - pwm_window_start_time < pid_output)
       ssr_on();
     else
       ssr_off();
-    mqtt_publish_duty_cycle();
   }
 
   // run handlers for subprocesses
@@ -477,6 +475,8 @@ void onGetStateMessageReceived(const String &message) {
     mqtt_publish_pid_enabled();
   } else if (strcmp(msg, MQTT_GET_MSG_PID_SETTINGS) == 0) {
     mqtt_publish_pid_settings();
+  } else if (strcmp(msg, MQTT_GET_MSG_DUTY_CYCLE) == 0) {
+    mqtt_publish_duty_cycle();
   }
 }
 
