@@ -239,18 +239,18 @@ bool ssr_state = false;
 void ssr_on(void) {
   if (ssr_state)
     return;
-  Serial.print("SSR ");
-  Serial.print(millis());
-  Serial.println(" on");
+  //Serial.print("SSR ");
+  //Serial.print(millis());
+  //Serial.println(" on");
   ssr_state = true;
   digitalWrite(SSR_PIN, HIGH);
 }
 
 void ssr_off(void) {
   if (ssr_state) {
-    Serial.print("SSR ");
-    Serial.print(millis());
-    Serial.println(" off");
+    //Serial.print("SSR ");
+    //Serial.print(millis());
+    //Serial.println(" off");
     ssr_state = false;
     digitalWrite(SSR_PIN, LOW);
   }
