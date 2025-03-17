@@ -5,6 +5,7 @@
 
 #include <PID_v2.h>
 #include <max6675.h>
+#include <Adafruit_MAX31855.h>
 #include <EspMQTTClient.h>
 #include <TM1637Display.h>
 
@@ -15,10 +16,10 @@
 #define MAXCS0_PIN 3
 #define MAXCS1_PIN 2
 #define MAXSCK_PIN 4
-MAX6675 kiln_thermocouple(MAXSCK_PIN, MAXCS0_PIN, MAXDO_PIN);
+Adafruit_MAX31855 kiln_thermocouple(MAXSCK_PIN, MAXCS0_PIN, MAXDO_PIN);
 MAX6675 housing_thermocouple(MAXSCK_PIN, MAXCS1_PIN, MAXDO_PIN);
-QTKilnThermo *kiln_thermo;
-QTKilnThermo *housing_thermo;
+QTKilnThermo *kiln_thermo = NULL;
+QTKilnThermo *housing_thermo = NULL;
 // wrappers to circumvent address of bound member function
 float kiln_readCelsius(void) {
   return kiln_thermocouple.readCelsius();
@@ -125,7 +126,7 @@ void onConnectionEstablished(void);
 void onConfigMessageReceived(const String &message);
 void onStateSetMessageReceived(const String &message);
 void onStateSetMessageReceived(const String &message);
-void lcd_update(uint16_t val, bool dots[4]);
+void lcd_update(uint16_t val, bool colon);
 
 // initialize the hardware and provide for any startup
 // delays according to manufacturer data sheets
@@ -205,6 +206,8 @@ void setup() {
   Serial.println("web updater listening");
 
   // do first thermocouple reading
+  kiln_thermocouple.begin();
+  delay(10);
   kiln_thermo = new QTKilnThermo(config.thermo_update_int_ms, &kiln_readCelsius);
   kiln_thermo->begin();
   kiln_thermo->enable();
@@ -218,14 +221,15 @@ void setup() {
 
   // lcd setup
   lcd.setBrightness(0x0f);
-  bool dots[4] = { true, false, true, false };
   // 0.5 is for rounding up
-  lcd_update(kiln_thermo->readCelsius() + 0.5, dots);
+  lcd_update(kiln_thermo->readCelsius() + 0.5, false);
 }
 
-void lcd_update(uint16_t val, bool dots[4]) {
-  lvd_val = val;
-  lcd.showNumberDecEx(val, (0b1 & dots[0] | 0b01 & dots[1] | 0b001 & dots[2]));
+void lcd_update(uint16_t val, bool colon) {
+  lcd_val = val;
+  //lcd.showNumberDecEx(val, 0b11100000);
+  byte charH[] = {SEG_B | SEG_C | SEG_E | SEG_F | SEG_G | 0b10000000};
+  lcd.setSegments( charH, 2, 1);
 }
 
 // state or preallocated variables for loop
@@ -238,7 +242,7 @@ void mqtt_publish_temps(void) {
     snprintf(buf2, MAX_BUF, MQTT_KILN_TEMP_FMT, kiln_thermo->lastTime(), kiln_thermo->readCelsius());
     mqtt_cli->publish(buf1, buf2);
     snprintf(buf1, MAX_BUF, MQTT_TOPIC_HOUSING_FMT, config.topic);
-    snprintf(buf2, MAX_BUF, MQTT_HOUSING_TEMP_FMT, kiln_thermo->lastTime(), housing_thermo->readCelsius());
+    snprintf(buf2, MAX_BUF, MQTT_HOUSING_TEMP_FMT, housing_thermo->lastTime(), housing_thermo->readCelsius());
     mqtt_cli->publish(buf1, buf2);
 }
 void mqtt_publish_pid_enabled(void) {
@@ -272,6 +276,7 @@ void ssr_on(void) {
   //Serial.print("SSR ");
   //Serial.print(millis());
   //Serial.println(" on");
+  lcd_update(lcd_val, true);
   ssr_state = true;
   digitalWrite(SSR_PIN, HIGH);
 }
@@ -281,6 +286,7 @@ void ssr_off(void) {
     //Serial.print("SSR ");
     //Serial.print(millis());
     //Serial.println(" off");
+    lcd_update(lcd_val, false);
     ssr_state = false;
     digitalWrite(SSR_PIN, LOW);
   }
@@ -299,6 +305,8 @@ void loop() {
     else
       ssr_off();
   }
+  // 0.5 is for rounding up
+  lcd_update(kiln_thermo->readCelsius() + 0.5, ssr_state);
 
   // run handlers for subprocesses
   kiln_thermo->loop();
