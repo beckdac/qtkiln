@@ -227,9 +227,9 @@ void setup() {
 
 void lcd_update(uint16_t val, bool colon) {
   lcd_val = val;
-  //lcd.showNumberDecEx(val, 0b11100000);
-  byte charH[] = {SEG_B | SEG_C | SEG_E | SEG_F | SEG_G | 0b10000000};
-  lcd.setSegments( charH, 2, 1);
+  lcd.showNumberDecEx(val, colon);
+  //byte charH[] = {SEG_B | SEG_C | SEG_E | SEG_F | SEG_G | 0b10000000};
+  //lcd.setSegments( charH, 1, 1);
 }
 
 // state or preallocated variables for loop
