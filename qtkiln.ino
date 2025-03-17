@@ -51,6 +51,8 @@ const char *sspw = WIFI_PASS;
 #define MQTT_TOPIC_DUTY_CYCLE_FMT "%s/duty_cycle"
 #define MQTT_DUTY_CYCLE_FMT "%g"
 #define MQTT_GET_MSG_DUTY_CYCLE "duty_cycle"
+#define MQTT_TOPIC_TARGET_TEMP_FMT "%s/target_temperature_C"
+#define MQTT_TARGET_TEMP_FMT "%g"
 #define MQTT_ON_CONN_MSG "connected"
 #include "mqtt_cred.h"
 EspMQTTClient *mqtt_cli = NULL;
@@ -221,10 +223,15 @@ void mqtt_publish_pid_settings(void) {
     snprintf(buf2, MAX_BUF, MQTT_PID_SETTINGS_FMT, Kp, Ki, Kd);
     mqtt_cli->publish(buf1, buf2);
 }
-void mqtt_publish_duty_cycle(void){
+void mqtt_publish_duty_cycle(void) {
     double duty_cycle = (double)pid_output / (double)config.pwm_update_int_ms;
     snprintf(buf1, MAX_BUF, MQTT_TOPIC_DUTY_CYCLE_FMT, config.topic);
     snprintf(buf2, MAX_BUF, MQTT_DUTY_CYCLE_FMT, duty_cycle);
+    mqtt_cli->publish(buf1, buf2);
+}
+void mqtt_publish_target_temp(void) {
+    snprintf(buf1, MAX_BUF, MQTT_TOPIC_TARGET_TEMP_FMT, config.topic);
+    snprintf(buf2, MAX_BUF, MQTT_TARGET_TEMP_FMT, target_temperature_C);
     mqtt_cli->publish(buf1, buf2);
 }
 
