@@ -406,9 +406,10 @@ void onConfigMessageReceived(const String &message) {
   }
 }
 
-#define MQTT_SET_MSG_TARGET_TEMP "target_temperature_C"
-#define MQTT_SET_MSG_PID_ENABLED "pid_enabled"
 #define MQTT_GET_MSG_TEMP "temperature_C"
+#define MQTT_SET_MSG_TARGET_TEMP "target_temperature_C"
+#define MQTT_GET_MSG_TARGET_TEMP MQTT_SET_MSG_TARGET_TEMP
+#define MQTT_SET_MSG_PID_ENABLED "pid_enabled"
 #define MQTT_GET_MSG_PID_ENABLED MQTT_SET_MSG_PID_ENABLED
 #define MQTT_SET_MSG_PID_SETTINGS "pid_settings_Kp_Ki_Kd"
 #define MQTT_GET_MSG_PID_SETTINGS MQTT_SET_MSG_PID_SETTINGS
@@ -471,6 +472,8 @@ void onGetStateMessageReceived(const String &message) {
   // the format should be key=value so if no = found, bad msg
   if (strcmp(msg, MQTT_GET_MSG_TEMP) == 0) {
     mqtt_publish_temps();
+  } else if (strcmp(msg, MQTT_GET_MSG_TARGET_TEMP) == 0) {
+    mqtt_publish_target_temp();
   } else if (strcmp(msg, MQTT_GET_MSG_PID_ENABLED) == 0) {
     mqtt_publish_pid_enabled();
   } else if (strcmp(msg, MQTT_GET_MSG_PID_SETTINGS) == 0) {
