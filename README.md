@@ -25,4 +25,6 @@ mosquitto_sub -v -u mqtt_user -P mqtt_password -h mqtt_host -p 1883 -t 'qtkiln/#
 mosquitto_pub -L mqtt://mqtt_user:mqtt_passowrd@mqtt_host/qtkiln/ECDA3BC01AB4/config -m 'mqtt_upd_int_ms=1000'
 # change the set point for the temperature control
 mosquitto_pub -L mqtt://mqtt_user:mqtt_passowrd@mqtt_host/qtkiln/ECDA3BC01AB4/config -m 'target_temperature_C=42'
+# turn on the pid control
+mosquitto_pub -L mqtt://mqtt_user:mqtt_passowrd@mqtt_host/qtkiln/ECDA3BC01AB4/set -m 'pid_enabled=1'
 ```
