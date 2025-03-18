@@ -32,12 +32,12 @@ void lcd_update(uint16_t val, bool bold, bool colon);
 
 // configuration
 #define PRFS_NAMESPACE MQTT_TOPIC_BASE
-#define PRFS_PID_KI "initial_Ki"
-#define PRFS_PID_KP "initial_Kp"
-#define PRFS_PID_KD "initial_Kd"
-#define PRFS_THRM_UPD_INT_MS "thrm_upd_int_ms"
-#define PRFS_PWM_UPD_INT_MS "pwm_upd_int_ms"
-#define PRFS_MQTT_UPD_INT_MS "mqtt_upd_int_ms"
+#define PRFS_PID_KI "Ki"
+#define PRFS_PID_KP "Kp"
+#define PRFS_PID_KD "Kd"
+#define PRFS_THRM_UPD_INT_MS "thermocouple_update_interval_ms"
+#define PRFS_PWM_WINDOW_MS "pwm_window_ms"
+#define PRFS_MQTT_UPD_INT_MS "mqtt_update_interval_ms"
 
 #define MAX_CFG_STR 32
 #define MAC_FMT_STR "%02X%02X%02X%02X%02X%02X"  

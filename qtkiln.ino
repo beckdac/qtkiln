@@ -61,7 +61,7 @@ struct Config {
   char mac[MAX_CFG_STR] = MAC_DEFAULT;
   char topic[MAX_CFG_STR] = "";
   uint16_t thermo_update_int_ms = 250;
-  uint16_t pwm_update_int_ms = 5000;
+  uint16_t pwm_window_ms = 5000;
   uint16_t mqtt_update_int_ms = 1000;
   uint8_t min_loop_ms = 5;
   double Kp = PID_KP, Ki = PID_KI, Kd = PID_KD;
@@ -78,7 +78,7 @@ void configLoad(const String &jsonString) {
     return;
   }
   config_set_thermo_update_int_ms(doc[PRFS_THRM_UPD_INT_MS] | config.thermo_update_int_ms);
-  config_set_pwm_update_int_ms(doc[PRFS_PWM_UPD_INT_MS] | config.pwm_update_int_ms);
+  config_set_pwm_window_ms(doc[PRFS_PWM_WINDOW_MS] | config.pwm_window_ms);
   config_set_mqtt_update_int_ms(doc[PRFS_MQTT_UPD_INT_MS] | config.mqtt_update_int_ms);
   config_set_pid_init_Kp(doc[PRFS_PID_KP] | config.Kp);
   config_set_pid_init_Ki(doc[PRFS_PID_KI] | config.Ki);
@@ -90,7 +90,7 @@ String configSerialize(void) {
   String jsonString;
 
   doc[PRFS_THRM_UPD_INT_MS] = config.thermo_update_int_ms;
-  doc[PRFS_PWM_UPD_INT_MS] = config.pwm_update_int_ms;
+  doc[PRFS_PWM_WINDOW_MS] = config.pwm_window_ms;
   doc[PRFS_MQTT_UPD_INT_MS] = config.mqtt_update_int_ms;
   doc[PRFS_PID_KP] = config.Kp;
   doc[PRFS_PID_KI] = config.Ki;
@@ -165,12 +165,12 @@ void setup() {
   // always turn it off incase we are coming back from a reset
   digitalWrite(SSR_PIN, LOW);
   Serial.print("PWM cycle window in ms is ");
-  Serial.println(config.pwm_update_int_ms);
+  Serial.println(config.pwm_window_ms);
   pwm_window_start_time = millis();
 
   // setup PID
   pid = new PID_v2(config.Kp, config.Ki, config.Kd, PID::Direct);
-  pid->SetOutputLimits(0, config.pwm_update_int_ms);
+  pid->SetOutputLimits(0, config.pwm_window_ms);
   
 
   // start the mqtt client
@@ -227,7 +227,7 @@ void mqtt_publish_state(bool active=false, bool pid_current=false) {
   if (pid_enabled || active) {
     doc["pid_enabled"] = pid_enabled;
     doc["target_temperature_C"] = target_temperature_C;
-    doc["duty_cycle"] = 100. * (double)pid_output / (double)config.pwm_update_int_ms;
+    doc["duty_cycle"] = 100. * (double)pid_output / (double)config.pwm_window_ms;
   }
   if (pid_enabled || pid_current) {
     double Kp = pid->GetKp(), Ki = pid->GetKi(), Kd = pid->GetKd();
@@ -269,8 +269,8 @@ void loop() {
   now = millis();
   if (pid_enabled) {
     // shift the next start time into the future
-    while (now - pwm_window_start_time > config.pwm_update_int_ms) {
-      pwm_window_start_time += config.pwm_update_int_ms;
+    while (now - pwm_window_start_time > config.pwm_window_ms) {
+      pwm_window_start_time += config.pwm_window_ms;
     }
     pid_output = pid->Run(kiln_thermo->getTemperatureC());
     if (now - pwm_window_start_time < pid_output)
@@ -315,22 +315,22 @@ void config_set_thermo_update_int_ms(uint16_t thermo_update_int_ms) {
   Serial.print("thermocouple update interval (ms) = ");
   Serial.println(config.thermo_update_int_ms);
 }
-void config_set_pwm_update_int_ms(uint16_t pwm_update_int_ms) {
-  if (pwm_update_int_ms < MIN_PWM_UPDATE_MS) {
+void config_set_pwm_window_ms(uint16_t pwm_window_ms) {
+  if (pwm_window_ms < MIN_PWM_UPDATE_MS) {
     Serial.print("PWM update interval must be > ");
     Serial.print(MIN_PWM_UPDATE_MS);
     Serial.println(" ms ... forcing to min");
-    pwm_update_int_ms = MIN_PWM_UPDATE_MS;
+    pwm_window_ms = MIN_PWM_UPDATE_MS;
   }
-  if (pwm_update_int_ms > MAX_PWM_UPDATE_MS) {
+  if (pwm_window_ms > MAX_PWM_UPDATE_MS) {
     Serial.print("PWM update interval must be < ");
     Serial.print(MAX_PWM_UPDATE_MS);
     Serial.println(" ms ... forcing to max");
-    pwm_update_int_ms = MAX_PWM_UPDATE_MS;
+    pwm_window_ms = MAX_PWM_UPDATE_MS;
   }
-  config.pwm_update_int_ms = pwm_update_int_ms;
+  config.pwm_window_ms = pwm_window_ms;
   Serial.print("PWM update interval (ms) = ");
-  Serial.println(config.pwm_update_int_ms);
+  Serial.println(config.pwm_window_ms);
 }
 void config_set_mqtt_update_int_ms(uint16_t mqtt_update_int_ms) {
   if (mqtt_update_int_ms < MIN_MQTT_UPDATE_MS) {
