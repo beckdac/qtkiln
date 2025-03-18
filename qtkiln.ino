@@ -181,14 +181,16 @@ void configUpdatePrefs(void) {
 void setup() {
   uint8_t u8mac[6];
 
-  configLoadPrefs();
+  delay(100);
+
+  // initialize the serial for 115200 baud
+  Serial.begin(115200);
 
   // lcd setup
   lcd.setBrightness(1);
   lcd.setSegments(LCD_BOOT);
 
-  // initialize the serial for 115200 baud
-  Serial.begin(115200);
+  configLoadPrefs();
 
   // connect to wifi
   WiFi.begin(ssid, sspw);
