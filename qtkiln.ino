@@ -63,6 +63,7 @@ struct Config {
   uint16_t thermo_update_int_ms = 250;
   uint16_t pwm_window_ms = 5000;
   uint16_t mqtt_update_int_ms = 1000;
+  bool mqtt_enable_debug_messages = false;
   uint8_t min_loop_ms = 5;
   double Kp = PID_KP, Ki = PID_KI, Kd = PID_KD;
 } config;
@@ -80,6 +81,7 @@ void configLoad(const String &jsonString) {
   config_set_thermo_update_int_ms(doc[PREFS_THRM_UPD_INT_MS] | config.thermo_update_int_ms);
   config_set_pwm_window_ms(doc[PREFS_PWM_WINDOW_MS] | config.pwm_window_ms);
   config_set_mqtt_update_int_ms(doc[PREFS_MQTT_UPD_INT_MS] | config.mqtt_update_int_ms);
+  config_set_mqtt_enable_debug_messages(doc[PREFS_MQTT_ENABLE_DBG] | config.mqtt_enable_debug_messages);
   config_set_pid_init_Kp(doc[PREFS_PID_KP] | config.Kp);
   config_set_pid_init_Ki(doc[PREFS_PID_KI] | config.Ki);
   config_set_pid_init_Kp(doc[PREFS_PID_KD] | config.Kd);
@@ -92,6 +94,7 @@ String configSerialize(void) {
   doc[PREFS_THRM_UPD_INT_MS] = config.thermo_update_int_ms;
   doc[PREFS_PWM_WINDOW_MS] = config.pwm_window_ms;
   doc[PREFS_MQTT_UPD_INT_MS] = config.mqtt_update_int_ms;
+  doc[PREFS_MQTT_ENABLE_DBG] = config.mqtt_enable_debug_messages;
   doc[PREFS_PID_KP] = config.Kp;
   doc[PREFS_PID_KI] = config.Ki;
   doc[PREFS_PID_KD] = config.Kd;
@@ -101,7 +104,14 @@ String configSerialize(void) {
   return jsonString;
 }
 
+void configReset(void) {
+  preferences.begin(PREFS_NAMESPACE, false);
+  preferences.clear();
+  preferences.end();
+}
+
 void configLoadPrefs(void) {
+  //configReset();
   preferences.begin(PREFS_NAMESPACE, true);
   String jsonString = preferences.getString(PREFS_CONFIG_JSON, String("{}"));
   preferences.end();
@@ -177,7 +187,7 @@ void setup() {
   mqtt_cli = new EspMQTTClient(WIFI_SSID, WIFI_PASS, MQTT_BROKER,
     MQTT_USER, MQTT_PASS, config.mac, MQTT_PORT);
   Serial.println("MQTT client connected");
-  mqtt_cli->enableDebuggingMessages(true);
+  mqtt_cli->enableDebuggingMessages(config.mqtt_enable_debug_messages);
 
   // initialize the thermocouples and get the first readingings
   // kiln
@@ -340,6 +350,11 @@ void config_set_mqtt_update_int_ms(uint16_t mqtt_update_int_ms) {
   config.mqtt_update_int_ms = mqtt_update_int_ms;
   Serial.print("mqtt update interval (ms) = ");
   Serial.println(config.mqtt_update_int_ms);
+}
+void config_set_mqtt_enable_debug_messages(bool enable_messages) {
+  config.mqtt_enable_debug_messages = enable_messages;
+  if (mqtt_cli)
+    mqtt_cli->enableDebuggingMessages(config.mqtt_enable_debug_messages);
 }
 void config_set_pid_init_Kp(double Kp) {
   if (Kp < 0)

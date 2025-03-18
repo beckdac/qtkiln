@@ -51,6 +51,7 @@ void lcd_update(uint16_t val, bool bold, bool colon);
 #define PREFS_THRM_UPD_INT_MS "thermocoupleUpdateInterval_ms"
 #define PREFS_PWM_WINDOW_MS "PWMWindow_ms"
 #define PREFS_MQTT_UPD_INT_MS "mqttUpdateInterval_ms"
+#define PREFS_MQTT_ENABLE_DBG "mqttEnableDebugMessages"
 
 // timings
 #define WIFI_SETUP_DELAY_MS 250
