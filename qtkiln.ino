@@ -77,24 +77,24 @@ void configLoad(const String &jsonString) {
     Serial.println(error.f_str());
     return;
   }
-  config_set_thermo_update_int_ms(doc[PRFS_THRM_UPD_INT_MS] | config.thermo_update_int_ms);
-  config_set_pwm_window_ms(doc[PRFS_PWM_WINDOW_MS] | config.pwm_window_ms);
-  config_set_mqtt_update_int_ms(doc[PRFS_MQTT_UPD_INT_MS] | config.mqtt_update_int_ms);
-  config_set_pid_init_Kp(doc[PRFS_PID_KP] | config.Kp);
-  config_set_pid_init_Ki(doc[PRFS_PID_KI] | config.Ki);
-  config_set_pid_init_Kp(doc[PRFS_PID_KD] | config.Kd);
+  config_set_thermo_update_int_ms(doc[PREFS_THRM_UPD_INT_MS] | config.thermo_update_int_ms);
+  config_set_pwm_window_ms(doc[PREFS_PWM_WINDOW_MS] | config.pwm_window_ms);
+  config_set_mqtt_update_int_ms(doc[PREFS_MQTT_UPD_INT_MS] | config.mqtt_update_int_ms);
+  config_set_pid_init_Kp(doc[PREFS_PID_KP] | config.Kp);
+  config_set_pid_init_Ki(doc[PREFS_PID_KI] | config.Ki);
+  config_set_pid_init_Kp(doc[PREFS_PID_KD] | config.Kd);
 }
 
 String configSerialize(void) {
   JsonDocument doc;
   String jsonString;
 
-  doc[PRFS_THRM_UPD_INT_MS] = config.thermo_update_int_ms;
-  doc[PRFS_PWM_WINDOW_MS] = config.pwm_window_ms;
-  doc[PRFS_MQTT_UPD_INT_MS] = config.mqtt_update_int_ms;
-  doc[PRFS_PID_KP] = config.Kp;
-  doc[PRFS_PID_KI] = config.Ki;
-  doc[PRFS_PID_KD] = config.Kd;
+  doc[PREFS_THRM_UPD_INT_MS] = config.thermo_update_int_ms;
+  doc[PREFS_PWM_WINDOW_MS] = config.pwm_window_ms;
+  doc[PREFS_MQTT_UPD_INT_MS] = config.mqtt_update_int_ms;
+  doc[PREFS_PID_KP] = config.Kp;
+  doc[PREFS_PID_KI] = config.Ki;
+  doc[PREFS_PID_KD] = config.Kd;
 
   serializeJson(doc, jsonString);
 
@@ -102,8 +102,8 @@ String configSerialize(void) {
 }
 
 void configLoadPrefs(void) {
-  preferences.begin("qtkiln", true);
-  String jsonString = preferences.getString(PRFS_CONFIG_JSON, String("{}"));
+  preferences.begin(PREFS_NAMESPACE, true);
+  String jsonString = preferences.getString(PREFS_CONFIG_JSON, String("{}"));
   preferences.end();
   Serial.print("read config: ");
   Serial.println(jsonString);
@@ -112,8 +112,8 @@ void configLoadPrefs(void) {
 
 void configUpdatePrefs(void) {
   String jsonString = configSerialize();
-  preferences.begin("qtkiln", false);
-  preferences.putString(PRFS_CONFIG_JSON, jsonString);
+  preferences.begin(PREFS_NAMESPACE, false);
+  preferences.putString(PREFS_CONFIG_JSON, jsonString);
   preferences.end();
   Serial.print("write config: ");
   Serial.println(jsonString);
@@ -299,51 +299,51 @@ void loop() {
 
 // set configuration variables after checking them
 void config_set_thermo_update_int_ms(uint16_t thermo_update_int_ms) {
-  if (thermo_update_int_ms < MIN_THERMO_UPDATE_MS) {
+  if (thermo_update_int_ms < THERMO_MIN_UPDATE_MS) {
     Serial.print("thermocouple update interval must be > ");
-    Serial.print(MIN_THERMO_UPDATE_MS);
+    Serial.print(THERMO_MIN_UPDATE_MS);
     Serial.println(" ms ... forcing to min");
-    thermo_update_int_ms = MIN_THERMO_UPDATE_MS;
+    thermo_update_int_ms = THERMO_MIN_UPDATE_MS;
   }
-  if (thermo_update_int_ms > MAX_THERMO_UPDATE_MS) {
+  if (thermo_update_int_ms > THERMO_MAX_UPDATE_MS) {
     Serial.print("thermocouple update interval must be < ");
-    Serial.print(MAX_THERMO_UPDATE_MS);
+    Serial.print(THERMO_MAX_UPDATE_MS);
     Serial.println(" ms ... forcing to max");
-    thermo_update_int_ms = MAX_THERMO_UPDATE_MS;
+    thermo_update_int_ms = THERMO_MAX_UPDATE_MS;
   }
   config.thermo_update_int_ms = thermo_update_int_ms;
   Serial.print("thermocouple update interval (ms) = ");
   Serial.println(config.thermo_update_int_ms);
 }
 void config_set_pwm_window_ms(uint16_t pwm_window_ms) {
-  if (pwm_window_ms < MIN_PWM_UPDATE_MS) {
-    Serial.print("PWM update interval must be > ");
-    Serial.print(MIN_PWM_UPDATE_MS);
+  if (pwm_window_ms < PWM_MIN_WINDOW_MS) {
+    Serial.print("PWM window must be > ");
+    Serial.print(PWM_MIN_WINDOW_MS);
     Serial.println(" ms ... forcing to min");
-    pwm_window_ms = MIN_PWM_UPDATE_MS;
+    pwm_window_ms = PWM_MIN_WINDOW_MS;
   }
-  if (pwm_window_ms > MAX_PWM_UPDATE_MS) {
-    Serial.print("PWM update interval must be < ");
-    Serial.print(MAX_PWM_UPDATE_MS);
+  if (pwm_window_ms > PWM_MAX_WINDOW_MS) {
+    Serial.print("PWM window must be < ");
+    Serial.print(PWM_MAX_WINDOW_MS);
     Serial.println(" ms ... forcing to max");
-    pwm_window_ms = MAX_PWM_UPDATE_MS;
+    pwm_window_ms = PWM_MAX_WINDOW_MS;
   }
   config.pwm_window_ms = pwm_window_ms;
   Serial.print("PWM update interval (ms) = ");
   Serial.println(config.pwm_window_ms);
 }
 void config_set_mqtt_update_int_ms(uint16_t mqtt_update_int_ms) {
-  if (mqtt_update_int_ms < MIN_MQTT_UPDATE_MS) {
+  if (mqtt_update_int_ms < MQTT_MIN_UPDATE_MS) {
     Serial.print("mqtt update interval must be > ");
-    Serial.print(MIN_MQTT_UPDATE_MS);
+    Serial.print(MQTT_MIN_UPDATE_MS);
     Serial.println(" ms ... forcing to min");
-    mqtt_update_int_ms = MIN_MQTT_UPDATE_MS;
+    mqtt_update_int_ms = MQTT_MIN_UPDATE_MS;
   }
-  if (mqtt_update_int_ms > MAX_MQTT_UPDATE_MS) {
+  if (mqtt_update_int_ms > MQTT_MAX_UPDATE_MS) {
     Serial.print("MQTT update interval must be < ");
-    Serial.print(MAX_MQTT_UPDATE_MS);
+    Serial.print(MQTT_MAX_UPDATE_MS);
     Serial.println(" ms ... forcing to max");
-    mqtt_update_int_ms = MAX_MQTT_UPDATE_MS;
+    mqtt_update_int_ms = MQTT_MAX_UPDATE_MS;
   }
   config.mqtt_update_int_ms = mqtt_update_int_ms;
   Serial.print("mqtt update interval (ms) = ");
@@ -375,8 +375,8 @@ void onConfigMessageReceived(const String &message) {
 
 // handle mqtt state messages
 void onSetStateMessageReceived(const String &message) {
-  char msg[MAX_MSG_BUF];
-  message.toCharArray(msg, MAX_MSG_BUF);
+  char msg[MAX_BUF];
+  message.toCharArray(msg, MAX_BUF);
 
   // the format should be key=value so if no = found, bad msg
       //if (pid_enabled)
@@ -399,8 +399,8 @@ void onSetStateMessageReceived(const String &message) {
 	 // pid->SetTunings(Kp, Ki, Kd);
 }
 void onGetStateMessageReceived(const String &message) {
-  char msg[MAX_MSG_BUF];
-  message.toCharArray(msg, MAX_MSG_BUF);
+  char msg[MAX_BUF];
+  message.toCharArray(msg, MAX_BUF);
 
 }
 
