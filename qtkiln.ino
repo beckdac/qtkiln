@@ -222,8 +222,8 @@ void mqtt_publish_state(bool active=false, bool pid_current=false) {
 
   doc["kiln"]["time_ms"] = kiln_thermo->lastTime();
   doc["kiln"]["temperature_C"] = kiln_thermo->getTemperatureC();
-  doc["housing"]["time_ms"] = kiln_thermo->lastTime();
-  doc["housing"]["temperature_C"] = kiln_thermo->getTemperatureC();
+  doc["housing"]["time_ms"] = housing_thermo->lastTime();
+  doc["housing"]["temperature_C"] = housing_thermo->getTemperatureC();
   if (pid_enabled || active) {
     doc["pid_enabled"] = pid_enabled;
     doc["target_temperature_C"] = target_temperature_C;
