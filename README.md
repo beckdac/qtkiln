@@ -21,11 +21,11 @@ Using `mosquitto` pub and sub clients on linux, you can modify the settings and 
 # listen to all traffic from kilns
 mosquitto_sub -v -u mqtt_user -P mqtt_password -h mqtt_host -p 1883 -t 'qtkiln/#'
 # change the config for a kiln and reset it
-# for example, change the mqtt update frequency to once per 1 second
-mosquitto_pub -L mqtt://mqtt_user:mqtt_passowrd@mqtt_host/qtkiln/ECDA3BC01AB4/config -m 'mqtt_upd_int_ms=1000'
+# for example, change the mqtt update frequency to once per 3 seconds
+mosquitto_pub -L mqtt://mqtt_user:mqtt_password@mqtt_host/qtkiln/ECDA3BC01AB4/config -m '{"mqtt_update_int_ms":"3000"}'
 # change the set point for the temperature control
-mosquitto_pub -L mqtt://mqtt_user:mqtt_passowrd@mqtt_host/qtkiln/ECDA3BC01AB4/set -m 'target_temperature_C=42'
+mosquitto_pub -L mqtt://mqtt_user:mqtt_password@mqtt_host/qtkiln/ECDA3BC01AB4/set -m '{"target_temperature_C":"42"}'
 # turn on the pid control
-mosquitto_pub -L mqtt://mqtt_user:mqtt_passowrd@mqtt_host/qtkiln/ECDA3BC01AB4/set -m 'pid_enabled=1'
-mosquitto_pub -L mqtt://mqtt_user:mqtt_passowrd@mqtt_host/qtkiln/ECDA3BC01AB4/get -m 'target_temperature_C'
+mosquitto_pub -L mqtt://mqtt_user:mqtt_password@mqtt_host/qtkiln/ECDA3BC01AB4/set -m '{"pid_enabled":"1"}'
+mosquitto_pub -L mqtt://mqtt_user:mqtt_password@mqtt_host/qtkiln/ECDA3BC01AB4/get -m '{"target_temperature_C":"42"}'
 ```
