@@ -4,29 +4,23 @@
 #include <Preferences.h>
 
 #include <PID_v2.h>
-#include <max6675.h>
-#include <Adafruit_MAX31855.h>
+#include <MAX31855.h>
+#include <MAX6675.h>
 #include <EspMQTTClient.h>
 #include <TM1637Display.h>
+#include <ArduinoJson.h>
 
 #include "qtkiln_thermo.h"
 
 // thermocouple phy
 #define MAXDO_PIN 5
-#define MAXCS0_PIN 3
-#define MAXCS1_PIN 2
+#define MAXCS0_PIN 3 // MAX31855 kiln
+#define MAXCS1_PIN 2 // MAX6675 housing
 #define MAXSCK_PIN 4
-Adafruit_MAX31855 kiln_thermocouple(MAXSCK_PIN, MAXCS0_PIN, MAXDO_PIN);
-MAX6675 housing_thermocouple(MAXSCK_PIN, MAXCS1_PIN, MAXDO_PIN);
+MAX31855 kiln_thermocouple(MAXCS0_PIN);
+MAX6675 housing_thermocouple(MAXCS1_PIN);
 QTKilnThermo *kiln_thermo = NULL;
 QTKilnThermo *housing_thermo = NULL;
-// wrappers to circumvent address of bound member function
-float kiln_readCelsius(void) {
-  return kiln_thermocouple.readCelsius();
-}
-float housing_readCelsius(void) {
-  return housing_thermocouple.readCelsius();
-}
 
 // WiFi credentials
 #define WIFI_SETUP_DELAY_MS 250
@@ -53,6 +47,7 @@ const char *sspw = WIFI_PASS;
 #define MQTT_TOPIC_DUTY_CYCLE_FMT "%s/duty_cycle"
 #define MQTT_DUTY_CYCLE_FMT "%g"
 #define MQTT_GET_MSG_DUTY_CYCLE "duty_cycle"
+#define MQTT_GET_MSG_PROGRAMS "programs"
 #define MQTT_TOPIC_TARGET_TEMP_FMT "%s/target_temperature_C"
 #define MQTT_TARGET_TEMP_FMT "%lu"
 #define MQTT_ON_CONN_MSG "connected"
@@ -87,6 +82,19 @@ const uint8_t LCD_BOOT[] = {
 uint8_t lcd_val = 0;
 bool dots[4] = { false, false, false, false };
 
+// prototypes
+void config_set_thermo_update_int_ms(uint16_t thermo_update_int_ms);
+void config_set_pwm_update_int_ms(uint16_t pwm_update_int_ms);
+void config_set_mqtt_update_int_ms(uint16_t mqtt_update_int_ms);
+void config_set_pid_init_Ki(double Ki);
+void config_set_pid_init_Kd(double Kd);
+void config_set_pid_init_Kp(double Kp);
+void onConnectionEstablished(void);
+void onConfigMessageReceived(const String &message);
+void onStateSetMessageReceived(const String &message);
+void onStateSetMessageReceived(const String &message);
+void lcd_update(uint16_t val, bool bold, bool colon);
+
 // configuration
 #define PRFS_PID_KI "initial_Ki"
 #define PRFS_PID_KP "initial_Kp"
@@ -103,7 +111,7 @@ Preferences preferences;
 #define MAX_PWM_UPDATE_MS 20000
 #define MIN_MQTT_UPDATE_MS 250
 #define MAX_MQTT_UPDATE_MS 15000
-struct config {
+struct Config {
   char mac[MAX_CFG_STR] = "c0:ff:ee:ca:fe:42";
   char topic[MAX_CFG_STR] = "";
   uint16_t thermo_update_int_ms = 250;
@@ -112,38 +120,72 @@ struct config {
   uint8_t min_loop_ms = 5;
   double Kp = 0, Ki = 0, Kd = 0;
 } config;
+#define PRFS_CONFIG_JSON "config.json"
+
+void configLoad(String jsonString) {
+  JsonDocument doc;
+
+  DeserializationError error = deserializeJson(doc, jsonString);
+
+  if (error) {
+    Serial.print(F("deserializeJson() failed: "));
+    Serial.println(error.f_str());
+    return;
+  }
+  config_set_thermo_update_int_ms(doc[PRFS_THRM_UPD_INT_MS] | MIN_THERMO_UPDATE_MS);
+  config_set_pwm_update_int_ms(doc[PRFS_PWM_UPD_INT_MS] | MIN_PWM_UPDATE_MS);
+  config_set_mqtt_update_int_ms(doc[PRFS_MQTT_UPD_INT_MS] | MIN_MQTT_UPDATE_MS);
+  config_set_pid_init_Ki(doc[PRFS_PID_KP] | PID_KP);
+  config_set_pid_init_Kd(doc[PRFS_PID_KI] | PID_KI);
+  config_set_pid_init_Kp(doc[PRFS_PID_KD] | PID_KD);
+}
+
+String configSerialize(void) {
+  JsonDocument doc;
+  String jsonString;
+
+  doc[PRFS_THRM_UPD_INT_MS] = config.thermo_update_int_ms;
+  doc[PRFS_PWM_UPD_INT_MS] = config.pwm_update_int_ms;
+  doc[PRFS_MQTT_UPD_INT_MS] = config.mqtt_update_int_ms;
+  doc[PRFS_PID_KP] = config.Kp;
+  doc[PRFS_PID_KI] = config.Ki;
+  doc[PRFS_PID_KD] = config.Kd;
+
+  serializeJson(doc, jsonString);
+
+  return jsonString;
+}
+
+void configLoadPrefs(void) {
+  preferences.begin("qtkiln", true);
+  String jsonString = preferences.getString(PRFS_CONFIG_JSON, String("{}"));
+  preferences.end();
+  Serial.print("read config: ");
+  Serial.println(jsonString);
+  configLoad(jsonString);
+}
+
+void configUpdatePrefs(void) {
+  String jsonString = configSerialize();
+  preferences.begin("qtkiln", false);
+  preferences.putString(PRFS_CONFIG_JSON, jsonString);
+  preferences.end();
+  Serial.print("write config: ");
+  Serial.println(jsonString);
+}
 
 // state variables are found above the loop function
-
-// prototypes
-void config_set_thermo_update_int_ms(uint16_t thermo_update_int_ms, bool update_prefs);
-void config_set_pwm_update_int_ms(uint16_t pwm_update_int_ms, bool update_prefs);
-void config_set_mqtt_update_int_ms(uint16_t mqtt_update_int_ms, bool update_prefs);
-void config_set_pid_init_Ki(double Ki, bool update_prefs);
-void config_set_pid_init_Kd(double Kd, bool update_prefs);
-void config_set_pid_init_Kp(double Kp, bool update_prefs);
-void onConnectionEstablished(void);
-void onConfigMessageReceived(const String &message);
-void onStateSetMessageReceived(const String &message);
-void onStateSetMessageReceived(const String &message);
-void lcd_update(uint16_t val, bool colon);
 
 // initialize the hardware and provide for any startup
 // delays according to manufacturer data sheets
 void setup() {
   uint8_t u8mac[6];
 
+  configLoadPrefs();
+
   // lcd setup
-  lcd.setBrightness(0x04);
+  lcd.setBrightness(1);
   lcd.setSegments(LCD_BOOT);
-
-  // load up the preferences so we can overwrite
-  // the config defaults
-  preferences.begin("qtkiln", false);
-  //preferences.clear();
-
-  // wait for MAX chip to stabilize
-  delay(500);
 
   // initialize the serial for 115200 baud
   Serial.begin(115200);
@@ -153,8 +195,6 @@ void setup() {
   while (WiFi.status() != WL_CONNECTED) {
     delay(WIFI_SETUP_DELAY_MS);
   }
-
-  // setup the config structure
 
   // get the mac
   esp_err_t ret = esp_wifi_get_mac(WIFI_IF_STA, u8mac);
@@ -172,17 +212,6 @@ void setup() {
 	MQTT_TOPIC_BASE, config.mac);
   Serial.print("topic root for this device is ");
   Serial.println(config.topic);
-
-  // set the variables from defaults and init pieces
-  config_set_thermo_update_int_ms(
-     preferences.getUShort(PRFS_THRM_UPD_INT_MS, MIN_THERMO_UPDATE_MS), false);
-  config_set_pwm_update_int_ms(
-     preferences.getUShort(PRFS_PWM_UPD_INT_MS, MIN_PWM_UPDATE_MS), false);
-  config_set_mqtt_update_int_ms(
-     preferences.getUShort(PRFS_MQTT_UPD_INT_MS, MIN_MQTT_UPDATE_MS), false);
-  config_set_pid_init_Kp(preferences.getDouble(PRFS_PID_KP, PID_KP), false);
-  config_set_pid_init_Ki(preferences.getDouble(PRFS_PID_KI, PID_KI), false);
-  config_set_pid_init_Kd(preferences.getDouble(PRFS_PID_KD, PID_KD), false);
 
   // setup PWM
   pinMode(SSR_PIN, OUTPUT);
@@ -202,34 +231,38 @@ void setup() {
     MQTT_USER, MQTT_PASS, config.mac, MQTT_PORT);
   Serial.println("MQTT client connected");
   //mqtt_cli->enableDebuggingMessages(true);
-  mqtt_cli->enableHTTPWebUpdater("/");
+  //mqtt_cli->enableHTTPWebUpdater("/");
   Serial.println("web updater listening");
 
-  // do first thermocouple reading
-  kiln_thermocouple.begin();
-  delay(10);
-  kiln_thermo = new QTKilnThermo(config.thermo_update_int_ms, &kiln_readCelsius);
+  // initialize the thermocouples and get the first readingings
+  // kiln
+  kiln_thermo = new QTKilnThermo(config.thermo_update_int_ms, &kiln_thermocouple, NULL);
   kiln_thermo->begin();
   kiln_thermo->enable();
-  housing_thermo = new QTKilnThermo(config.thermo_update_int_ms, &housing_readCelsius);
+  // housing
+  housing_thermo = new QTKilnThermo(config.thermo_update_int_ms, NULL, &housing_thermocouple);
   housing_thermo->begin();
   housing_thermo->enable();
+  // get the readings
   Serial.print("kiln C = "); 
-  Serial.print(kiln_thermo->readCelsius());
+  Serial.print(kiln_thermo->getTemperatureC());
   Serial.print(" housing C = ");
-  Serial.println(housing_thermo->readCelsius());
+  Serial.println(housing_thermo->getTemperatureC());
 
   // lcd setup
-  lcd.setBrightness(0x0f);
   // 0.5 is for rounding up
-  lcd_update(kiln_thermo->readCelsius() + 0.5, false);
+  lcd_update(kiln_thermo->getTemperatureC() + 0.5, false, false);
+
+  configSerialize();
 }
 
-void lcd_update(uint16_t val, bool colon) {
+void lcd_update(uint16_t val, bool bold, bool colon) {
   lcd_val = val;
-  lcd.showNumberDecEx(val, colon);
-  //byte charH[] = {SEG_B | SEG_C | SEG_E | SEG_F | SEG_G | 0b10000000};
-  //lcd.setSegments( charH, 1, 1);
+  if (bold)
+    lcd.setBrightness(7);
+  else
+    lcd.setBrightness(1);
+  lcd.showNumberDecEx(val, (colon ? 0xff: 0));
 }
 
 // state or preallocated variables for loop
@@ -239,10 +272,10 @@ char buf1[MAX_BUF], buf2[MAX_BUF];
 
 void mqtt_publish_temps(void) {
     snprintf(buf1, MAX_BUF, MQTT_TOPIC_KILN_FMT, config.topic);
-    snprintf(buf2, MAX_BUF, MQTT_KILN_TEMP_FMT, kiln_thermo->lastTime(), kiln_thermo->readCelsius());
+    snprintf(buf2, MAX_BUF, MQTT_KILN_TEMP_FMT, kiln_thermo->lastTime(), kiln_thermo->getTemperatureC());
     mqtt_cli->publish(buf1, buf2);
     snprintf(buf1, MAX_BUF, MQTT_TOPIC_HOUSING_FMT, config.topic);
-    snprintf(buf2, MAX_BUF, MQTT_HOUSING_TEMP_FMT, housing_thermo->lastTime(), housing_thermo->readCelsius());
+    snprintf(buf2, MAX_BUF, MQTT_HOUSING_TEMP_FMT, housing_thermo->lastTime(), housing_thermo->getTemperatureC());
     mqtt_cli->publish(buf1, buf2);
 }
 void mqtt_publish_pid_enabled(void) {
@@ -268,6 +301,9 @@ void mqtt_publish_target_temp(void) {
     snprintf(buf2, MAX_BUF, MQTT_TARGET_TEMP_FMT, target_temperature_C);
     mqtt_cli->publish(buf1, buf2);
 }
+void mqtt_publish_programs(void) {
+
+}
 
 bool ssr_state = false;
 void ssr_on(void) {
@@ -276,7 +312,6 @@ void ssr_on(void) {
   //Serial.print("SSR ");
   //Serial.print(millis());
   //Serial.println(" on");
-  lcd_update(lcd_val, true);
   ssr_state = true;
   digitalWrite(SSR_PIN, HIGH);
 }
@@ -286,7 +321,6 @@ void ssr_off(void) {
     //Serial.print("SSR ");
     //Serial.print(millis());
     //Serial.println(" off");
-    lcd_update(lcd_val, false);
     ssr_state = false;
     digitalWrite(SSR_PIN, LOW);
   }
@@ -299,14 +333,14 @@ void loop() {
     while (now - pwm_window_start_time > config.pwm_update_int_ms) {
       pwm_window_start_time += config.pwm_update_int_ms;
     }
-    pid_output = pid->Run(kiln_thermo->readCelsius());
+    pid_output = pid->Run(kiln_thermo->getTemperatureC());
     if (now - pwm_window_start_time < pid_output)
       ssr_on();
     else
       ssr_off();
   }
   // 0.5 is for rounding up
-  lcd_update(kiln_thermo->readCelsius() + 0.5, ssr_state);
+  lcd_update(kiln_thermo->getTemperatureC() + 0.5, ssr_state, ssr_state);
 
   // run handlers for subprocesses
   kiln_thermo->loop();
@@ -325,7 +359,7 @@ void loop() {
 }
 
 // set configuration variables after checking them
-void config_set_thermo_update_int_ms(uint16_t thermo_update_int_ms, bool update_prefs) {
+void config_set_thermo_update_int_ms(uint16_t thermo_update_int_ms) {
   if (thermo_update_int_ms < MIN_THERMO_UPDATE_MS) {
     Serial.print("thermocouple update interval must be > ");
     Serial.print(MIN_THERMO_UPDATE_MS);
@@ -341,10 +375,8 @@ void config_set_thermo_update_int_ms(uint16_t thermo_update_int_ms, bool update_
   config.thermo_update_int_ms = thermo_update_int_ms;
   Serial.print("thermocouple update interval (ms) = ");
   Serial.println(config.thermo_update_int_ms);
-  if (update_prefs)
-     preferences.putUShort(PRFS_THRM_UPD_INT_MS, config.thermo_update_int_ms);
 }
-void config_set_pwm_update_int_ms(uint16_t pwm_update_int_ms, bool update_prefs) {
+void config_set_pwm_update_int_ms(uint16_t pwm_update_int_ms) {
   if (pwm_update_int_ms < MIN_PWM_UPDATE_MS) {
     Serial.print("PWM update interval must be > ");
     Serial.print(MIN_PWM_UPDATE_MS);
@@ -360,10 +392,8 @@ void config_set_pwm_update_int_ms(uint16_t pwm_update_int_ms, bool update_prefs)
   config.pwm_update_int_ms = pwm_update_int_ms;
   Serial.print("PWM update interval (ms) = ");
   Serial.println(config.pwm_update_int_ms);
-  if (update_prefs)
-     preferences.putUShort(PRFS_PWM_UPD_INT_MS, config.pwm_update_int_ms);
 }
-void config_set_mqtt_update_int_ms(uint16_t mqtt_update_int_ms, bool update_prefs) {
+void config_set_mqtt_update_int_ms(uint16_t mqtt_update_int_ms) {
   if (mqtt_update_int_ms < MIN_MQTT_UPDATE_MS) {
     Serial.print("mqtt update interval must be > ");
     Serial.print(MIN_MQTT_UPDATE_MS);
@@ -379,29 +409,21 @@ void config_set_mqtt_update_int_ms(uint16_t mqtt_update_int_ms, bool update_pref
   config.mqtt_update_int_ms = mqtt_update_int_ms;
   Serial.print("mqtt update interval (ms) = ");
   Serial.println(config.mqtt_update_int_ms);
-  if (update_prefs)
-     preferences.putUShort(PRFS_MQTT_UPD_INT_MS, config.mqtt_update_int_ms);
 }
-void config_set_pid_init_Kp(double Kp, bool update_prefs) {
+void config_set_pid_init_Kp(double Kp) {
   config.Kp = Kp;
   Serial.print("PID initial Kp set to ");
   Serial.println(config.Kp);
-  if (update_prefs)
-     preferences.putDouble(PRFS_PID_KP, config.Kp);
 }
-void config_set_pid_init_Ki(double Ki, bool update_prefs) {
+void config_set_pid_init_Ki(double Ki) {
   config.Ki = Ki;
   Serial.print("PID initial Ki set to ");
   Serial.println(config.Ki);
-  if (update_prefs)
-     preferences.putDouble(PRFS_PID_KI, config.Ki);
 }
-void config_set_pid_init_Kd(double Kd, bool update_prefs) {
+void config_set_pid_init_Kd(double Kd) {
   config.Kd = Kd;
   Serial.print("PID initial Kd set to ");
   Serial.println(config.Kd);
-  if (update_prefs)
-     preferences.putDouble(PRFS_PID_KD, config.Kd);
 }
 
 
@@ -419,32 +441,33 @@ void onConfigMessageReceived(const String &message) {
     *eqptr = NULL;
     if (strcmp(msg, PRFS_THRM_UPD_INT_MS) == 0) {
       unsigned long val = strtoul(valptr, NULL, 0);
-      config_set_thermo_update_int_ms(val, true);
+      config_set_thermo_update_int_ms(val);
       config_updated = true;
     } else if (strcmp(msg, PRFS_PWM_UPD_INT_MS) == 0) {
       unsigned long val = strtoul(valptr, NULL, 0);
-      config_set_pwm_update_int_ms(val, true);
+      config_set_pwm_update_int_ms(val);
       config_updated = true;
     } else if (strcmp(msg, PRFS_MQTT_UPD_INT_MS) == 0) {
       unsigned long val = strtoul(valptr, NULL, 0);
-      config_set_mqtt_update_int_ms(val, true);
+      config_set_mqtt_update_int_ms(val);
       config_updated = true;
     } else if (strcmp(msg, PRFS_PID_KP) == 0) {
       double val = strtod(valptr, NULL);
-      config_set_pid_init_Kp(val, true);
+      config_set_pid_init_Kp(val);
       config_updated = true;
     } else if (strcmp(msg, PRFS_PID_KI) == 0) {
       double val = strtod(valptr, NULL);
-      config_set_pid_init_Ki(val, true);
+      config_set_pid_init_Ki(val);
       config_updated = true;
     } else if (strcmp(msg, PRFS_PID_KD) == 0) {
       double val = strtod(valptr, NULL);
-      config_set_pid_init_Kd(val, true);
+      config_set_pid_init_Kd(val);
       config_updated = true;
     }
   }
 
   if (config_updated) {
+    configUpdatePrefs();
     Serial.println("system configuration updated, restarting...");
     delay(1000);
     esp_restart();
@@ -478,7 +501,9 @@ void onSetStateMessageReceived(const String &message) {
       Serial.print("target temperature set via mqtt to (C) ");
       Serial.println(val);
       target_temperature_C = val;
-      pid->Setpoint(target_temperature_C);
+      if (pid_enabled)
+        pid->Setpoint(target_temperature_C);
+      mqtt_publish_target_temp();
     } else if (strcmp(msg, MQTT_SET_MSG_PID_ENABLED) == 0) {
       bool val = strtoul(valptr, NULL, 0);
       Serial.print("pid enabled is set to ");
@@ -487,13 +512,14 @@ void onSetStateMessageReceived(const String &message) {
         // turning on
         Serial.print("pid turning on with target temperature of (C) ");
 	Serial.println(target_temperature_C);
-        pid->Start(kiln_thermo->readCelsius(), 0, target_temperature_C);
+        pid->Start(kiln_thermo->getTemperatureC(), 0, target_temperature_C);
       } else if (pid_enabled && !val) {
         // turning off
         Serial.println("pid turning off");
         ssr_off();
       }
       pid_enabled=val;
+      mqtt_publish_pid_enabled();
     } else if (strcmp(msg, MQTT_SET_MSG_PID_SETTINGS) == 0) {
       double Kp, Ki, Kd;
       uint8_t parsed = sscanf(valptr, MQTT_SET_MSG_PID_SETTINGS_FMT, &Kp, &Ki, &Kd);
@@ -525,6 +551,8 @@ void onGetStateMessageReceived(const String &message) {
     mqtt_publish_pid_settings();
   } else if (strcmp(msg, MQTT_GET_MSG_DUTY_CYCLE) == 0) {
     mqtt_publish_duty_cycle();
+  } else if (strcmp(msg, MQTT_GET_MSG_PROGRAMS) == 0) {
+    mqtt_publish_programs();
   }
 }
 
