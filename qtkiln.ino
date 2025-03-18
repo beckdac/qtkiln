@@ -177,9 +177,7 @@ void setup() {
   mqtt_cli = new EspMQTTClient(WIFI_SSID, WIFI_PASS, MQTT_BROKER,
     MQTT_USER, MQTT_PASS, config.mac, MQTT_PORT);
   Serial.println("MQTT client connected");
-  //mqtt_cli->enableDebuggingMessages(true);
-  //mqtt_cli->enableHTTPWebUpdater("/");
-  //Serial.println("web updater listening");
+  mqtt_cli->enableDebuggingMessages(true);
 
   // initialize the thermocouples and get the first readingings
   // kiln
@@ -248,18 +246,12 @@ bool ssr_state = false;
 void ssr_on(void) {
   if (ssr_state)
     return;
-  //Serial.print("SSR ");
-  //Serial.print(millis());
-  //Serial.println(" on");
   ssr_state = true;
   digitalWrite(SSR_PIN, HIGH);
 }
 
 void ssr_off(void) {
   if (ssr_state) {
-    //Serial.print("SSR ");
-    //Serial.print(millis());
-    //Serial.println(" off");
     ssr_state = false;
     digitalWrite(SSR_PIN, LOW);
   }
@@ -350,16 +342,22 @@ void config_set_mqtt_update_int_ms(uint16_t mqtt_update_int_ms) {
   Serial.println(config.mqtt_update_int_ms);
 }
 void config_set_pid_init_Kp(double Kp) {
+  if (Kp < 0)
+    Kp = 0;
   config.Kp = Kp;
   Serial.print("PID initial Kp set to ");
   Serial.println(config.Kp);
 }
 void config_set_pid_init_Ki(double Ki) {
+  if (Ki < 0)
+    Ki = 0;
   config.Ki = Ki;
   Serial.print("PID initial Ki set to ");
   Serial.println(config.Ki);
 }
 void config_set_pid_init_Kd(double Kd) {
+  if (Kd < 0)
+    Kd = 0;
   config.Kd = Kd;
   Serial.print("PID initial Kd set to ");
   Serial.println(config.Kd);
