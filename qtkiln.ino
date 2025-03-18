@@ -39,7 +39,7 @@ unsigned long pwm_window_start_time = 0;
 // PID object
 PID_v2 *pid = NULL;
 boolean pid_enabled = false;
-uint16_t target_temperature_C = 0;
+uint16_t targetTemperatureC = 0;
 unsigned long pid_output = 0;
 
 // LCD
@@ -179,7 +179,7 @@ void setup() {
   Serial.println("MQTT client connected");
   //mqtt_cli->enableDebuggingMessages(true);
   //mqtt_cli->enableHTTPWebUpdater("/");
-  Serial.println("web updater listening");
+  //Serial.println("web updater listening");
 
   // initialize the thermocouples and get the first readingings
   // kiln
@@ -226,7 +226,7 @@ void mqtt_publish_state(bool active=false, bool pid_current=false) {
   doc["housing"]["temperature_C"] = housing_thermo->getTemperatureC();
   if (pid_enabled || active) {
     doc["pid_enabled"] = pid_enabled;
-    doc["target_temperature_C"] = target_temperature_C;
+    doc["targetTemperatureC"] = targetTemperatureC;
     doc["duty_cycle"] = 100. * (double)pid_output / (double)config.pwm_window_ms;
   }
   if (pid_enabled || pid_current) {
@@ -375,33 +375,69 @@ void onConfigMessageReceived(const String &message) {
 
 // handle mqtt state messages
 void onSetStateMessageReceived(const String &message) {
-  char msg[MAX_BUF];
-  message.toCharArray(msg, MAX_BUF);
+  JsonDocument doc;
+  double Kp = pid->GetKp(), Ki = pid->GetKi(), Kd = pid->GetKd();
+  bool updateTunings = false;
 
-  // the format should be key=value so if no = found, bad msg
-      //if (pid_enabled)
-      //  pid->Setpoint(target_temperature_C);
-      //mqtt_publish_target_temp();
-      
-  //if (!pid_enabled && val) {
-        // turning on
-        //pid->Start(kiln_thermo->getTemperatureC(), 0, target_temperature_C);
-      //} else if (pid_enabled && !val) {
-        // turning off
-        //ssr_off();
-      //pid_enabled=val;\
+  DeserializationError error = deserializeJson(doc, message);
 
-      //double Kp, Ki, Kd;
-      //uint8_t parsed = sscanf(valptr, MQTT_SET_MSG_PID_SETTINGS_FMT, &Kp, &Ki, &Kd);
-      //if ((Kp >= 0 & Ki >= 0 && Kd >= 0) && parsed == 3) {
-//	Serial.print("updating instaneous tunings from mqtt Kp = ");
-	//if (pid)
-	 // pid->SetTunings(Kp, Ki, Kd);
+  if (error) {
+    Serial.print(F("deserializeJson() failed: "));
+    Serial.println(error.f_str());
+    return;
+  }
+  // if this request turns on the pid enable, then
+  // do it first before parsing others, like target temp
+  // if it turns it off, make sure the ssr is off
+  JsonVariant tmpObj = doc[MSG_PID_ENABLED];
+  if (!tmpObj.isNull()) {
+    pid_enabled = doc[MSG_PID_ENABLED];
+    if (!pid_enabled)
+        ssr_off();
+  }
+  // go through the keys and handle each
+  for (JsonPair kv : doc.as<JsonObject>()) {
+    if (strcmp(kv.key().c_str(), MSG_TARGET_TEMP) == 0) {
+      double tmp = doc[MSG_TARGET_TEMP];
+      if (tmp < TARGET_TEMP_MIN) {
+        tmp = TARGET_TEMP_MIN;
+      } else if (tmp > TARGET_TEMP_MAX) {
+        tmp = TARGET_TEMP_MAX;
+      }
+      targetTemperatureC = tmp;
+      if (pid_enabled && tmpObj) // pid was off, start it 
+        pid->Start(kiln_thermo->getTemperatureC(), 0, targetTemperatureC);
+      else if (pid_enabled) // pid was already enabled, just updating the set point
+        pid->Setpoint(targetTemperatureC);
+    } else if (strcmp(kv.key().c_str(), PREFS_PID_KP) == 0 && pid_enabled) {
+      Kp = doc[PREFS_PID_KP];
+      if (Kp < 0)
+        Kp = 0;
+      updateTunings = true;
+    } else if (strcmp(kv.key().c_str(), PREFS_PID_KI) == 0 && pid_enabled) {
+      Ki = doc[PREFS_PID_KI];
+      if (Ki < 0)
+        Ki = 0;
+      updateTunings = true;
+    } else if (strcmp(kv.key().c_str(), PREFS_PID_KD) == 0 && pid_enabled) {
+      Kd = doc[PREFS_PID_KD];
+      if (Kd < 0)
+        Kd = 0;
+      updateTunings = true;
+    }
+  }
+  if (updateTunings && pid) {
+    Serial.print("updating live tunings to ( ");
+    Serial.print(Kp);
+    Serial.print(" ");
+    Serial.print(Ki);
+    Serial.print(" ");
+    Serial.print(Kd);
+    Serial.println(" )");
+    pid->SetTunings(Kp, Ki, Kd);
+  }
 }
 void onGetStateMessageReceived(const String &message) {
-  char msg[MAX_BUF];
-  message.toCharArray(msg, MAX_BUF);
-
 }
 
 // when the connection to the mqtt has completed

@@ -15,7 +15,7 @@ void onStateSetMessageReceived(const String &message);
 void lcd_update(uint16_t val, bool bold, bool colon);
 
 // max typical string buffer
-#define MAX_BUF 512
+#define MAX_BUF 256
 
 // default initial PID params
 #define PID_KP 10.0
@@ -23,8 +23,8 @@ void lcd_update(uint16_t val, bool bold, bool colon);
 #define PID_KD 0.1
 
 // global temperature maxes
-#define MIN_TARGET_TEMP 0
-#define MAX_TARGET_TEMP 1100
+#define TARGET_TEMP_MIN 0
+#define TARGET_TEMP_MAX 1100
 
 // MQTT keywords
 #define MQTT_TOPIC_FMT "%s/%s"
@@ -34,13 +34,9 @@ void lcd_update(uint16_t val, bool bold, bool colon);
 #define MQTT_TOPIC_SET "set"
 #define MQTT_TOPIC_GET "get"
 
-#define MQTT_GET_MSG_TEMP "temperature_C"
-#define MQTT_SET_MSG_TARGET_TEMP "target_temperature_C"
-#define MQTT_GET_MSG_TARGET_TEMP MQTT_SET_MSG_TARGET_TEMP
-#define MQTT_SET_MSG_PID_ENABLED "pid_enabled"
-#define MQTT_GET_MSG_PID_ENABLED MQTT_SET_MSG_PID_ENABLED
-#define MQTT_SET_MSG_PID_SETTINGS "pid_settings_Kp_Ki_Kd"
-#define MQTT_GET_MSG_PID_SETTINGS MQTT_SET_MSG_PID_SETTINGS
+#define MSG_TEMP "temperatureC"
+#define MSG_TARGET_TEMP "targetTemperatureC"
+#define MSG_PID_ENABLED "pidEnabled"
 
 // configuration
 #define MAC_DEFAULT "c0:ff:ee:ca:fe:42"
@@ -52,9 +48,9 @@ void lcd_update(uint16_t val, bool bold, bool colon);
 #define PREFS_PID_KI "Ki"
 #define PREFS_PID_KP "Kp"
 #define PREFS_PID_KD "Kd"
-#define PREFS_THRM_UPD_INT_MS "thermocouple_update_interval_ms"
-#define PREFS_PWM_WINDOW_MS "pwm_window_ms"
-#define PREFS_MQTT_UPD_INT_MS "mqtt_update_interval_ms"
+#define PREFS_THRM_UPD_INT_MS "thermocoupleUpdateInterval_ms"
+#define PREFS_PWM_WINDOW_MS "PWMWindow_ms"
+#define PREFS_MQTT_UPD_INT_MS "mqttUpdateInterval_ms"
 
 // timings
 #define WIFI_SETUP_DELAY_MS 250
