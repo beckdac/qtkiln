@@ -6,17 +6,17 @@ QTKilnLog::QTKilnLog(void) {
   _lastMsgTime = 0;
 }
 
-void QTKilnThermo::begin(void) {
+void QTKilnLog::begin(void) {
 }
 
-void QTKilnThermo::print(void) {
+void QTKilnLog::print(const char *fmt, ...) {
 }
 
-void QTKilnThermo::debug(void) {
+void QTKilnLog::debug(uint16_t priority, const char *fmt, ...) {
 }
 
-void QTKilnThermo::warn(void) {
+void QTKilnLog::warn(const char *fmt, ...) {
 }
 
-void QTKilnThermo::error(void) {
+void QTKilnLog::error(const char *fmt, ...) {
 }
