@@ -14,7 +14,24 @@ void onStateSetMessageReceived(const String &message);
 void onStateSetMessageReceived(const String &message);
 void lcd_update(uint16_t val, bool bold, bool colon);
 
+#define PID_KP 10.0
+#define PID_KI 0.2
+#define PID_KD 0.1
+
+#define MIN_TARGET_TEMP 0
+#define MAX_TARGET_TEMP 1100
+
+#define MQTT_TOPIC_FMT "%s/%s"
+#define MQTT_TOPIC_BASE "qtkiln"
+#define MQTT_TOPIC_STATE "state"
+#define MQTT_TOPIC_CONFIG "config"
+#define MQTT_TOPIC_SET "set"
+#define MQTT_TOPIC_GET "get"
+
+#define WIFI_SETUP_DELAY_MS 250
+
 // configuration
+#define PRFS_NAMESPACE MQTT_TOPIC_BASE
 #define PRFS_PID_KI "initial_Ki"
 #define PRFS_PID_KP "initial_Kp"
 #define PRFS_PID_KD "initial_Kd"
