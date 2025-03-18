@@ -275,6 +275,8 @@ void loop() {
       pwm_window_start_time += config.pwm_window_ms;
     }
     pid_output = pid->Run(kiln_thermo->getTemperatureC());
+    Serial.print("pid_output: ");
+    Serial.println(pid_output);
     if (now - pwm_window_start_time < pid_output)
       ssr_on();
     else
@@ -417,11 +419,20 @@ void onSetStateMessageReceived(const String &message) {
       } else if (tmp > TARGET_TEMP_MAX) {
         tmp = TARGET_TEMP_MAX;
       }
+      Serial.print("setting target temperature (C): ");
+      Serial.println(tmp);
       targetTemperatureC = tmp;
-      if (pid_enabled && tmpObj) // pid was off, start it 
+      if (pid_enabled && tmpObj) { // pid was off, start it 
+        pid->SetTunings(config.Kp, config.Ki, config.Kd);
+        pid->SetSampleTime(config.min_loop_ms); // rough estimate of how often run gets called
         pid->Start(kiln_thermo->getTemperatureC(), 0, targetTemperatureC);
-      else if (pid_enabled) // pid was already enabled, just updating the set point
+        Serial.print("setting detaul tunings, sample time and starting with target (C): ");
+        Serial.println(targetTemperatureC);
+      } else if (pid_enabled) { // pid was already enabled, just updating the set point
         pid->Setpoint(targetTemperatureC);
+        Serial.print("changing setpoint to (C): ");
+        Serial.println(targetTemperatureC);
+      }
     } else if (strcmp(kv.key().c_str(), PREFS_PID_KP) == 0 && pid_enabled) {
       Kp = doc[PREFS_PID_KP];
       if (Kp < 0)
@@ -459,7 +470,6 @@ void onConnectionEstablished(void) {
 
   snprintf(topic, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_CONFIG);
   mqtt_cli->subscribe(topic, onConfigMessageReceived);
-
   snprintf(topic, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_GET);
   mqtt_cli->subscribe(topic, onGetStateMessageReceived);
   snprintf(topic, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_SET);
