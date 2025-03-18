@@ -275,8 +275,8 @@ void loop() {
       pwm_window_start_time += config.pwm_window_ms;
     }
     pid_output = pid->Run(kiln_thermo->getTemperatureC());
-    Serial.print("pid_output: ");
-    Serial.println(pid_output);
+    //Serial.print("pid_output: ");
+    //Serial.println(pid_output);
     if (now - pwm_window_start_time < pid_output)
       ssr_on();
     else
