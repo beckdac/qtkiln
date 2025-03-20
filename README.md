@@ -30,3 +30,23 @@ mosquitto_pub -L mqtt://mqtt_user:mqtt_password@mqtt_host/qtkiln/ECDA3BC01AB4/se
 mosquitto_pub -L mqtt://mqtt_user:mqtt_password@mqtt_host/qtkiln/ECDA3BC01AB4/set -m '{"pidEnabled":1}'
 mosquitto_pub -L mqtt://mqtt_user:mqtt_password@mqtt_host/qtkiln/ECDA3BC01AB4/get -m '{"targetTemperature_C":42}'
 ```
+
+### Current dependency set:
+```
+WiFi at version 3.1.3
+Networking at version 3.1.3
+Preferences at version 3.1.3
+PID_v2 at version 2.0.1
+MAX31855 Thermocouple at version 1.2.2
+SPI at version 3.1.3
+MAX6675 Thermocouple at version 1.3.2
+EspMQTTClientFork at version 1.13.4
+ArduinoOTA at version 3.1.3
+Update at version 3.1.3
+PubSubClient at version 2.8
+WebServer at version 3.1.3
+FS at version 3.1.3
+ESPmDNS at version 3.1.3
+TM1637 at version 1.2.0
+ArduinoJson at version 7.3.1
+```
