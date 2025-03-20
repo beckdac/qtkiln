@@ -7,13 +7,15 @@
 #include "qtkiln_log.h"
 #include "qtkiln.h"
 
+extern Config config;
+
 extern QTKilnLog qtklog;
 extern char buf1[MAX_BUF];
 
 extern QTKilnThermo *kiln_thermo;
 extern QTKilnThermo *housing_thermo;
 
-extern QTKilnPWM *PWM;
+extern QTKilnPWM pwm;
 
 // use a static function to be the entry point for the task
 void mqttTaskFunction(void *pvParameter) {
@@ -37,7 +39,11 @@ uint16_t QTKilnMQTT::getUpdateInterval_ms(void) {
   return _updateInterval_ms;
 }
 
-void QTKilnMQTT::begin(void) {
+void QTKilnMQTT::begin(EspMQTTClient *mqttCli) {
+  if (!mqttCli)
+    qtkiln.error("mqtt client passwd to mqtt task was null");
+  _mqttCli = mqttCli;
+
   BaseType_t rc = xTaskCreate(mqttTaskFunction, "mqtt",
 		  QTKILN_MQTT_TASK_STACK_SIZE, (void *)this, QTKILN_MQTT_TASK_PRI,
 		  &_taskHandle);
@@ -78,20 +84,20 @@ void QTKilnMQTT::_publish_state(bool active, bool pid_current) {
   doc["kiln"]["temperature_C"] = kiln_thermo->getTemperature_C();
   doc["housing"]["time_ms"] = housing_thermo->getLastTime();
   doc["housing"]["temperature_C"] = housing_thermo->getTemperature_C();
-  if (PWM.isEnabled() || active) {
-    doc["pidEnabled"] = PWM.isEnabled();
-    doc["targetTemperatureC"] = PWM.getTargetTemperature_C();
-    doc["dutyCycle"] = PWM.getDutyCycle();
+  if (pwm.isEnabled() || active) {
+    doc["pidEnabled"] = pwm.isEnabled();
+    doc["targetTemperatureC"] = pwm.getTargetTemperature_C();
+    doc["dutyCycle"] = pwm.getDutyCycle();
   }
-  if (PWM.isEnabled() || pid_current) {
-    double Kp = pid->GetKp(), Ki = pid->GetKi(), Kd = pid->GetKd();
+  if (pwm.isEnabled() || pid_current) {
+    double Kp = pwm.getKp(), Ki = pwm.getKi(), Kd = pwm.getKd();
     doc["pid"]["Kp"] = Kp;
     doc["pid"]["Ki"] = Ki;
     doc["pid"]["Kd"] = Kd;
   }
   serializeJson(doc, jsonString);
   snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_STATE);
-  mqtt_cli->publish(buf1, jsonString);
+  _mqttCli->publish(buf1, jsonString);
 }
 
 void QTKilnMQTT::thread(void) {
@@ -99,7 +105,7 @@ void QTKilnMQTT::thread(void) {
 
   while (1) {
     if (_enabled) {
-      mqtt_publish_state(false, false)
+      _publish_state(false, false)
     }
     xDelay = pdMS_TO_TICKS(_updateInterval_ms);
     vTaskDelay(xDelay);

@@ -13,6 +13,8 @@
 #include "qtkiln_log.h"
 #include "qtkiln_thermo.h"
 #include "qtkiln_program.h"
+#include "qtkiln_pwm.h"
+#include "qtkiln_mqtt.h"
 
 char buf1[MAX_BUF];
 
@@ -36,8 +38,8 @@ const char *sspw = WIFI_PASS;
 
 // MQTT server
 #include "mqtt_cred.h"
-EspMQTTClient *mqtt_cli = NULL;
-QTKilnMQTT mqtt;
+EspMQTTClient *mqttCli = NULL;
+QTKilnMQTT mqtt();
 
 // PWM object
 #define SSR_PIN 8
@@ -197,10 +199,11 @@ void setup() {
   program.begin(); 
 
   // start the mqtt client
-  mqtt_cli = new EspMQTTClient(WIFI_SSID, WIFI_PASS, MQTT_BROKER,
+  mqttCli = new EspMQTTClient(WIFI_SSID, WIFI_PASS, MQTT_BROKER,
     MQTT_USER, MQTT_PASS, config.mac, MQTT_PORT);
   qtklog.print("MQTT client connected");
-  mqtt_cli->enableDebuggingMessages(config.mqtt_enable_debug_messages);
+  mqttCli->enableDebuggingMessages(config.mqtt_enable_debug_messages);
+  mqtt.begin(mqttCli);
 
   // initialize the thermocouples and get the first readingings
   // kiln
@@ -254,7 +257,7 @@ void mqtt_publish_statistics(void) {
 
   serializeJson(doc, jsonString);
   snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_STATE);
-  mqtt_cli->publish(buf1, jsonString);
+  mqttCli->publish(buf1, jsonString);
 }
 
 void mqtt_publish_programs(void) {
@@ -280,7 +283,7 @@ void loop() {
   lcd_update(kiln_thermo->getTemperatureC() + 0.5, ssr_state, ssr_state);
 
   // run handlers for subprocesses
-  mqtt_cli->loop();
+  mqttCli->loop();
 
   // do a minimal delay for the PWM and other service loops
   delay(config.min_loop_ms);
@@ -343,8 +346,8 @@ void config_set_mqttUpdateInterval_ms(uint16_t mqttUpdateInterval_ms) {
 }
 void config_set_mqtt_enable_debug_messages(bool enable_messages) {
   config.mqtt_enable_debug_messages = enable_messages;
-  if (mqtt_cli)
-    mqtt_cli->enableDebuggingMessages(config.mqtt_enable_debug_messages);
+  if (mqttCli)
+    mqttCli->enableDebuggingMessages(config.mqtt_enable_debug_messages);
 }
 void config_set_programUpdateInterval_ms(uint16_t programUpdateInterval_ms) {
   if (programUpdateInterval_ms < PGM_MIN_UPDATE_MS) {
@@ -463,11 +466,11 @@ void onConnectionEstablished(void) {
   char topic[MAX_BUF];
 
   snprintf(topic, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_CONFIG);
-  mqtt_cli->subscribe(topic, onConfigMessageReceived);
+  mqttCli->subscribe(topic, onConfigMessageReceived);
   snprintf(topic, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_GET);
-  mqtt_cli->subscribe(topic, onGetStateMessageReceived);
+  mqttCli->subscribe(topic, onGetStateMessageReceived);
   snprintf(topic, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_SET);
-  mqtt_cli->subscribe(topic, onSetStateMessageReceived);
+  mqttCli->subscribe(topic, onSetStateMessageReceived);
 
   mqtt_publish_state(false, false);
 }

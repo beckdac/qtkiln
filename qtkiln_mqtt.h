@@ -13,7 +13,7 @@ class QTKilnMQTT
   public:
     QTKilnMQTT(uint16_t updateInterval_ms);
 
-    void begin(void);
+    void begin(EspMQTTClient *mqttCli);
     unsigned long msSinceLastUpdate(void);
     void enable(void);
     void disable(void);
@@ -31,6 +31,7 @@ class QTKilnMQTT
     unsigned long _lastTime = 0;	// the last time the system was updated
     bool _enabled = false;		// is the system running
     TaskHandle_t _taskHandle = NULL;	// for managing the task later
+    EspMQTTClient *_mqttClie = NULL;	// pubsub thing
 };
 
 #endif
