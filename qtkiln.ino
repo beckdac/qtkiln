@@ -407,7 +407,7 @@ void onSetStateMessageReceived(const String &message) {
   if (!tmpObj.isNull()) {
     pid_enabled = doc[MSG_PID_ENABLED];
     if (!pid_enabled && pid_enabled_at_start) {
-      ssr_off();
+      PWM.disable();
       qtklog.print("stopping PID control");
     }
   }
@@ -420,15 +420,12 @@ void onSetStateMessageReceived(const String &message) {
       } else if (tmp > TARGET_TEMP_MAX) {
         tmp = TARGET_TEMP_MAX;
       }
-      targetTemperatureC = tmp;
-      if (pid_enabled && !pid_enabled_at_start) { // pid was off, start it 
-        pid->SetTunings(config.Kp, config.Ki, config.Kd);
-        pid->SetSampleTime(config.min_loop_ms); // rough estimate of how often run gets called
-        pid->Start(kiln_thermo->getTemperatureC(), 0, targetTemperatureC);
-        qtklog.print("starting PID with target temperature of %d C", targetTemperatureC);
-      } else if (pid_enabled) { // pid was already enabled, just updating the set point
-        pid->Setpoint(targetTemperatureC);
-        qtklog.print("adjusting PID target temperature to %d C", targetTemperatureC);
+      PWM.setTargetTemperature_C(tmp);
+      if (PWM.isEnabled() && !pid_enabled_at_start) { // pid was off, start it 
+	PWM.enable();
+        qtklog.print("starting PID with target temperature of %d C", PWM.getTargetTemperature_C());
+      } else if (PWM.isEnabled()) { // pid was already enabled, just updating the set point
+        qtklog.print("adjusting current PID target temperature to %d C", targetTemperatureC);
       } else {
         qtklog.print("setting PID target temperature to %d C", targetTemperatureC);
       }
@@ -449,9 +446,9 @@ void onSetStateMessageReceived(const String &message) {
       updateTunings = true;
     }
   }
-  if (updateTunings && pid) {
+  if (updateTunings) {
     qtklog.print("updating live tunings to (Kp = %g, Ki = %g, Kd = %g)", Kp, Ki, Kd);
-    pid->SetTunings(Kp, Ki, Kd);
+    PWM->setTunings(Kp, Ki, Kd);
   }
 }
 void onGetStateMessageReceived(const String &message) {

@@ -43,7 +43,7 @@ class QTKilnPWM
     unsigned long _lastTime = 0;	// the last time the system was updated
     bool _enabled = false;		// is the system running
     uint16_t _output_ms = 0;		// where in the frequency window the high state should turn off
-    PID_v2 *pid;			// PID control object
+    PID_v2 *_pid;			// PID control object
     uint16_t _targetTemperature_C = 0;	// target temperature for PID
     TaskHandle_t _taskHandle = NULL;	// for managing the task later
 };

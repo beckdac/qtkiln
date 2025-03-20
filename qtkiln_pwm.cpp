@@ -9,8 +9,6 @@ extern QTKilnLog qtklog;
 extern QTKilnThermo *kiln_thermo;
 extern QTKilnThermo *housing_thermo;
 
-PID_v2 *pid;
-
 // use a static function to be the entry point for the task
 void pwmPWMFunction(void *pvParameter) {
   QTKilnPWM *pwm = static_cast<QTKilnPWM *>(pvParameter);
@@ -56,11 +54,17 @@ void QTKilnPWM::enable(void) {
     _pid->SetTunings(config.Kp, config.Ki, config.Kd);
     _pid->SetSampleTime(_windowSize_ms);
     _pid->Start(kiln_thermo->getTemperature_C(), 0, _targetTemperature_C);
+    qtklog.debug(0, "PID is being enabled for the PWM task");
   }
 }
 
 void QTKilnPWM::disable(void) {
+  bool wasEnabled = _enabled;
   _enabled = false;
+  if (wasEnabled) {
+    ssr_off();
+    qtklog.debug(0, "PID is being disabled for the PWM task");
+  }
 }
 
 bool QTKilnPWM::isEnabled(void) {
@@ -85,19 +89,19 @@ unsigned long QTKilnPWM::getLastTime(void) {
 }
 
 float QTKilnPWM::getDutyCycle(void) {
-  return 100. * (float)output_ms / (float)_windowSize_ms;
+  return 100. * (float)_output_ms / (float)_windowSize_ms;
 }
 
 void QTKilnPWM::thread(void) {
   TickType_t xDelay;
 
   while (1) {
-    if (_enabled && pid) {
+    if (_enabled && _pid) {
       unsigned long now = millis();
       while (now - _windowStartTime > _windowSize_ms) {
         _windowStartTime += _windowSize_ms;
       }
-      _output_ms = pid->Run(kiln_thermo->getTemperature_C());
+      _output_ms = _pid->Run(kiln_thermo->getTemperature_C());
       if (now - _windowStartTime < _output_ms)
         ssr_on();
       else
