@@ -237,9 +237,25 @@ void lcd_update(uint16_t val, bool bold, bool colon) {
 
 // state or preallocated variables for loop
 unsigned long last_time = 0, now, delta_t;
-char buf1[MAX_BUF], buf2[MAX_BUF];
+char buf1[MAX_BUF];
 
-void mqtt_publish_state(bool active=false, bool pid_current=false, bool statistics=false) {
+void mqtt_publish_statistics(void) {
+  JsonDocument doc;
+  String jsonString;
+
+  doc["time"] = millis();
+  doc["log"]["reallocationCount"] = qtklog.getReallocationCount();
+  doc["log"]["debugPriorityCutoff"] = qtklog.getDebugPriorityCutoff();
+  doc["max31855"]["highWaterMark"] = kiln_thermo->getTaskHighWaterMark();
+  doc["max6675"]["highWaterMark"] = housing_thermo->getTaskHighWaterMark();
+  doc["program"]["highWaterMark"] = program.getTaskHighWaterMark();
+
+  serializeJson(doc, jsonString);
+  snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_STATE);
+  mqtt_cli->publish(buf1, jsonString);
+}
+
+void mqtt_publish_state(bool active, bool pid_current) {
   JsonDocument doc;
   String jsonString;
 
@@ -257,13 +273,6 @@ void mqtt_publish_state(bool active=false, bool pid_current=false, bool statisti
     doc["pid"]["Kp"] = Kp;
     doc["pid"]["Ki"] = Ki;
     doc["pid"]["Kd"] = Kd;
-  }
-  if (statistics) {
-    doc["log"]["reallocationCount"] = qtklog.getReallocationCount();
-    doc["log"]["debugPriorityCutoff"] = qtklog.getDebugPriorityCutoff();
-    doc["max31855"]["highWaterMark"] = kiln_thermo->getTaskHighWaterMark();
-    doc["max6675"]["highWaterMark"] = housing_thermo->getTaskHighWaterMark();
-    doc["program"]["highWaterMark"] = program.getTaskHighWaterMark();
   }
   serializeJson(doc, jsonString);
   snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_STATE);
@@ -312,7 +321,7 @@ void loop() {
   delta_t = now - last_time;
   // if we have waited long enough, update the thermos
   if (delta_t >= config.mqttUpdateInterval_ms) {
-    mqtt_publish_state();
+    mqtt_publish_state(false, false);
     last_time = millis();
   }
   // do a minimal delay for the PWM and other service loops
@@ -489,7 +498,7 @@ void onSetStateMessageReceived(const String &message) {
 }
 void onGetStateMessageReceived(const String &message) {
   if (strcmp(message.c_str(), "statistics") == 0) {
-    mqtt_publish_state(false, false, true);
+    mqtt_publish_statistics();
     qtklog.print("statistics requested via mqtt");
   }
 }
@@ -505,5 +514,5 @@ void onConnectionEstablished(void) {
   snprintf(topic, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_SET);
   mqtt_cli->subscribe(topic, onSetStateMessageReceived);
 
-  mqtt_publish_state();
+  mqtt_publish_state(false, false);
 }

@@ -10,7 +10,7 @@
 #define PGM_TRANS_WINDOW_MIN "transitionWindow_min"
 #define PGM_DWELL_MIN "dwell_min"
 
-#define QTKILN_PROGRAM_TASK_STACK_SIZE 4096
+#define QTKILN_PROGRAM_TASK_STACK_SIZE 2048
 #define QTKILN_PROGRAM_TASK_PRI tskIDLE_PRIORITY + 3
 
 extern "C" void programTaskFunction(void *pvParameter);
