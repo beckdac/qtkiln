@@ -28,7 +28,6 @@ QTKilnMQTT::QTKilnMQTT(void) {
   _updateInterval_ms = QTKILN_MQTT_DEFAULT_UPDATE_INTERVAL_MS;
   _lastTime = 0;
   _taskHandle = NULL;
-  _targetTemperature_C = 0;
 }
 
 void QTKilnMQTT::setUpdateInterval_ms(uint16_t updateInterval_ms) {

@@ -4,10 +4,10 @@
 #include "Arduino.h"
 #include "EspMQTTClient.h"
 
-#define QTKILN_MQTT_TASK_STACK_SIZE 2048
+#define QTKILN_MQTT_TASK_STACK_SIZE 4096
 #define QTKILN_MQTT_TASK_PRI tskIDLE_PRIORITY + 2
 
-#define QTKILN_MQTT_DEFAULT_MQTT_UPDATE_INTERVAL_MS 1000
+#define QTKILN_MQTT_DEFAULT_UPDATE_INTERVAL_MS 1000
 
 extern "C" void mqttTaskFunction(void *pvParameter);
 

@@ -221,6 +221,9 @@ void setup() {
   // lcd setup
   // 0.5 is for rounding up
   lcd_update(kiln_thermo->getTemperature_C() + 0.5, false, false);
+
+  // turn this on at the end
+  mqtt.enable();
 }
 
 void lcd_update(uint16_t val, bool bold, bool colon) {
@@ -238,19 +241,19 @@ void mqtt_publish_statistics(void) {
   JsonDocument doc;
   String jsonString;
 
-  multi_heap_info_t info;
-  heap_caps_get_info(&info, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT); // internal RAM, memory capable to store data or to create new task
-  doc["mem"]["total_free"] =  info.total_free_bytes;   // total currently free in all non-continues blocks
-  doc["mem"]["min_free"] = info.minimum_free_bytes;  // minimum free ever
-  doc["mem"]["lrgst_free_blk"] = info.largest_free_block;   // largest continues block to allocate big array
+  //multi_heap_info_t info;
+  //heap_caps_get_info(&info, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT); // internal RAM, memory capable to store data or to create new task
+  //doc["mem"]["total_free"] =  info.total_free_bytes;   // total currently free in all non-continues blocks
+  //doc["mem"]["min_free"] = info.minimum_free_bytes;  // minimum free ever
+  //doc["mem"]["lrgst_free_blk"] = info.largest_free_block;   // largest continues block to allocate big array
 
   doc["time"] = millis();
   doc["log"]["reallocationCount"] = qtklog.getReallocationCount();
   doc["log"]["debugPriorityCutoff"] = qtklog.getDebugPriorityCutoff();
   doc["max31855"]["highWaterMark"] = kiln_thermo->getTaskHighWaterMark();
   doc["max6675"]["highWaterMark"] = housing_thermo->getTaskHighWaterMark();
-  doc["program"]["highWaterMark"] = program.getTaskHighWaterMark();
-  doc["pwm"]["highWaterMark"] = pwm.getTaskHighWaterMark();
+  //doc["program"]["highWaterMark"] = program.getTaskHighWaterMark();
+  //doc["pwm"]["highWaterMark"] = pwm.getTaskHighWaterMark();
   doc["mqtt"]["highWaterMark"] = mqtt.getTaskHighWaterMark();
 
 
