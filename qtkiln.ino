@@ -340,8 +340,10 @@ void config_set_thermoUpdateInterval_ms(uint16_t thermoUpdateInterval_ms) {
     thermoUpdateInterval_ms = THERMO_MAX_UPDATE_MS;
   }
   config.thermoUpdateInterval_ms = thermoUpdateInterval_ms;
-  kiln_thermo->setUpdateInterval_ms(config.thermoUpdateInterval_ms);
-  housing_thermo->setUpdateInterval_ms(config.thermoUpdateInterval_ms);
+  if (kiln_thermo)
+    kiln_thermo->setUpdateInterval_ms(config.thermoUpdateInterval_ms);
+  if (housing_thermo)
+    housing_thermo->setUpdateInterval_ms(config.thermoUpdateInterval_ms);
   qtklog.print("thermocouple update interval = %d ms", config.thermoUpdateInterval_ms);
 }
 void config_set_pwmWindow_ms(uint16_t pwmWindow_ms) {
@@ -487,8 +489,8 @@ void onSetStateMessageReceived(const String &message) {
 }
 void onGetStateMessageReceived(const String &message) {
   if (strcmp(message.c_str(), "statistics") == 0) {
-    qtklog.print("statistics requested via mqtt");
     mqtt_publish_state(false, false, true);
+    qtklog.print("statistics requested via mqtt");
   }
 }
 
