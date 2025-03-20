@@ -9,22 +9,48 @@
 extern Preferences preferences;
 extern QTKilnLog qtklog;
 
+// use a static function to be the entry point for the task
+void programTaskFunction(void *pvParameter) {
+  QTKilnProgram *program = static_cast<QTKilnProgram *>(pvParameter);
+
+  program->thread();
+}
+
 QTKilnProgram::QTKilnProgram(void) {
+  _updateInterval_ms = 1000;
   _running = false;
   _paused = false;
   _currentProgram = NULL;
   _currentStep = 0;
+  _taskHandle = NULL;
 }
 
 void QTKilnProgram::begin(void) {
   qtklog.print("program runner initialized");
 }
 
-void QTKilnProgram::loop(void) {
-  if (_running) {
-    if (!_paused) {
+void QTKilnProgram::thread(void) {
+  TickType_t xDelay;
+
+  while (1) {
+    if (_running) {
+      if (!_paused) {
+      }
     }
+    xDelay = pdMS_TO_TICKS(_updateInterval_ms);
+    vTaskDelay(xDelay);
   }
+}
+
+TaskHandle_t QTKilnProgram::getTask(void) {
+  return _taskHandle;
+}
+
+UBaseType_t QTKilnProgram::getTaskHighWaterMark(void) {
+  if (_taskHandle)
+    return uxTaskGetStackHighWaterMark(_taskHandle);
+  qtklog.warn("no task associated with qtkiln program in high watermark test");
+  return 0;
 }
 
 struct QTKilnProgramStruct *QTKilnProgram::_parseProgram(const String &program) {
@@ -178,4 +204,13 @@ void QTKilnProgram::unPause(void) {
     qtklog.print("unpausing program execution at step %d", _currentStep);
     _paused = true;
   }
+}
+
+void QTKilnProgram::setUpdateInterval_ms(uint16_t updateInterval_ms) {
+  _updateInterval_ms = updateInterval_ms;
+  qtklog.debug(0, "program update interval modified to %d ms", _updateInterval_ms);
+}
+
+uint16_t QTKilnThermo::getUpdateInterval_ms(void) {
+  return _updateInterval_ms;
 }

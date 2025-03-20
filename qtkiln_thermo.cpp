@@ -10,8 +10,8 @@ void thermoTaskFunction(void *pvParameter) {
   thermo->thread();
 }
 
-QTKilnThermo::QTKilnThermo(uint16_t interval_ms, MAX31855 *max31855, MAX6675 *max6675) {
-  _interval_ms = interval_ms;
+QTKilnThermo::QTKilnThermo(uint16_t updateInterval_ms, MAX31855 *max31855, MAX6675 *max6675) {
+  _updateInterval_ms = updateInterval_ms;
   _max31855 = max31855;
   _max6675 = max6675;
   _lastTime = 0;
@@ -23,6 +23,15 @@ QTKilnThermo::QTKilnThermo(uint16_t interval_ms, MAX31855 *max31855, MAX6675 *ma
     _err = true;
     _errno = QTKILN_ERRNO_INVALID_TYPE;
   }
+}
+
+void QTKilnThermo::setUpdateInterval_ms(uint16_t updateInterval_ms) {
+  _updateInterval_ms = updateInterval_ms;
+  qtklog.debug(0, "thermo update interval modified to %d ms", _updateInterval_ms);
+}
+
+uint16_t QTKilnThermo::getUpdateInterval_ms(void) {
+  return _updateInterval_ms;
 }
 
 void QTKilnThermo::begin(void) {
@@ -152,7 +161,7 @@ void QTKilnThermo::thread(void) {
     if (_enabled) {
       _doRead();
     }
-    xDelay = pdMS_TO_TICKS(_interval_ms);
+    xDelay = pdMS_TO_TICKS(_updateInterval_ms);
     vTaskDelay(xDelay);
   }
 }

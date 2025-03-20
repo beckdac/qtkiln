@@ -13,6 +13,7 @@
 #include "qtkiln.h"
 #include "qtkiln_log.h"
 #include "qtkiln_thermo.h"
+#include "qtkiln_program.h"
 
 // setup the basic log for serial logging
 QTKilnLog qtklog(true);
@@ -59,6 +60,9 @@ const uint8_t LCD_BOOT[] = {
 };
 uint8_t lcd_val = 0;
 bool dots[4] = { false, false, false, false };
+
+// Program execution engine
+QTKilnProgram program;
 
 // Preferences interface
 Preferences preferences;
@@ -193,7 +197,9 @@ void setup() {
   // setup PID
   pid = new PID_v2(config.Kp, config.Ki, config.Kd, PID::Direct);
   pid->SetOutputLimits(0, config.pwmWindow_ms);
-  
+ 
+  // start the program runner task
+  program.begin(); 
 
   // start the mqtt client
   mqtt_cli = new EspMQTTClient(WIFI_SSID, WIFI_PASS, MQTT_BROKER,
@@ -257,6 +263,7 @@ void mqtt_publish_state(bool active=false, bool pid_current=false, bool statisti
     doc["log"]["debugPriorityCutoff"] = qtklog.getDebugPriorityCutoff();
     doc["max31855"]["highWaterMark"] = kiln_thermo->getTaskHighWaterMark();
     doc["max6675"]["highWaterMark"] = housing_thermo->getTaskHighWaterMark();
+    doc["program"]["highWaterMark"] = program.getTaskHighWaterMark();
   }
   serializeJson(doc, jsonString);
   snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_STATE);
@@ -333,6 +340,8 @@ void config_set_thermoUpdateInterval_ms(uint16_t thermoUpdateInterval_ms) {
     thermoUpdateInterval_ms = THERMO_MAX_UPDATE_MS;
   }
   config.thermoUpdateInterval_ms = thermoUpdateInterval_ms;
+  kiln_thermo->setUpdateInterval_ms(config.thermoUpdateInterval_ms);
+  housing_thermo->setUpdateInterval_ms(config.thermoUpdateInterval_ms);
   qtklog.print("thermocouple update interval = %d ms", config.thermoUpdateInterval_ms);
 }
 void config_set_pwmWindow_ms(uint16_t pwmWindow_ms) {
@@ -380,6 +389,7 @@ void config_set_programUpdateInterval_ms(uint16_t programUpdateInterval_ms) {
     programUpdateInterval_ms = PGM_MAX_UPDATE_MS;
   }
   config.programUpdateInterval_ms = programUpdateInterval_ms;
+  program.setUpdateInterval_ms(config.programUpdateInterval_ms);
   qtklog.print("program update interval = %d ms", config.programUpdateInterval_ms);
 }
 void config_set_pid_init_Kp(double Kp) {
@@ -476,6 +486,10 @@ void onSetStateMessageReceived(const String &message) {
   }
 }
 void onGetStateMessageReceived(const String &message) {
+  if (strcmp(message.c_str(), "statistics") == 0) {
+    qtklog.print("statistics requested via mqtt");
+    mqtt_publish_state(false, false, true);
+  }
 }
 
 // when the connection to the mqtt has completed

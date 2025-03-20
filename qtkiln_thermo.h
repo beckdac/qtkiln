@@ -9,7 +9,7 @@
 #define QTKILN_ERRNO_INVALID_TYPE 2
 #define QTKILN_ERRNO_MAX31855_NOT_DETECTED 3
 
-#define QTKILN_THERMO_TASK_STACK_SIZE 2048
+#define QTKILN_THERMO_TASK_STACK_SIZE 1024+512
 #define QTKILN_THERMO_TASK_PRI tskIDLE_PRIORITY + 1
 
 extern "C" void thermoTaskFunction(void *pvParameter);
@@ -17,7 +17,7 @@ extern "C" void thermoTaskFunction(void *pvParameter);
 class QTKilnThermo
 {
   public:
-    QTKilnThermo(uint16_t interval_ms, MAX31855 *max31855, MAX6675 *max6675);
+    QTKilnThermo(uint16_t updateInterval_ms, MAX31855 *max31855, MAX6675 *max6675);
 
     void begin(void);
     unsigned long msSinceLastUpdate(void);
@@ -29,10 +29,12 @@ class QTKilnThermo
     void thread(void);
     TaskHandle_t getTask(void);
     UBaseType_t getTaskHighWaterMark(void);
+    uint16_t getUpdateInterval_ms(void);
+    void setUpdateInterval_ms(uint16_t updateInterval_ms);
 
   private:
     void _MAX31855_verbose_diagnose(uint8_t code);
-    uint16_t _interval_ms = 250;	// default update period
+    uint16_t _updateInterval_ms = 250;	// default update period
     MAX31855 *_max31855;		// if this is not null, then it is 
     MAX6675 *_max6675;			//	this type
     unsigned long _lastTime = 0;	// the last time the system was updated
