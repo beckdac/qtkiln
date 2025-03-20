@@ -83,11 +83,11 @@ unsigned long QTKilnThermo::msSinceLastUpdate(void) {
   return now - _lastTime;
 }
 
-unsigned long QTKilnThermo::lastTime(void) {
+unsigned long QTKilnThermo::getLastTime(void) {
   return _lastTime;
 }
 
-float QTKilnThermo::getTemperatureC(void) {
+float QTKilnThermo::getTemperature_C(void) {
   if (!_lastTime) {
     _doRead();
   }

@@ -3,7 +3,6 @@
 #include <Arduino.h>
 #include <Preferences.h>
 
-#include <PID_v2.h>
 #include <MAX31855.h>
 #include <MAX6675.h>
 #include <EspMQTTClient.h>
@@ -14,6 +13,8 @@
 #include "qtkiln_log.h"
 #include "qtkiln_thermo.h"
 #include "qtkiln_program.h"
+
+char buf1[MAX_BUF];
 
 // setup the basic log for serial logging
 QTKilnLog qtklog(true);
@@ -36,17 +37,12 @@ const char *sspw = WIFI_PASS;
 // MQTT server
 #include "mqtt_cred.h"
 EspMQTTClient *mqtt_cli = NULL;
+QTKilnMQTT mqtt;
 
 // PWM object
 #define SSR_PIN 8
 bool ssr_state = false;
-unsigned long pwm_window_start_time = 0;
-
-// PID object
-PID_v2 *pid = NULL;
-boolean pid_enabled = false;
-uint16_t targetTemperatureC = 0;
-unsigned long pid_output = 0;
+QTKilnPWM pwm;
 
 // LCD
 #define LCD_CLK 1
@@ -195,8 +191,7 @@ void setup() {
   pwm_window_start_time = millis();
 
   // setup PID
-  pid = new PID_v2(config.Kp, config.Ki, config.Kd, PID::Direct);
-  pid->SetOutputLimits(0, config.pwmWindow_ms);
+  pwm.begin();
  
   // start the program runner task
   program.begin(); 
@@ -236,12 +231,16 @@ void lcd_update(uint16_t val, bool bold, bool colon) {
 }
 
 // state or preallocated variables for loop
-unsigned long last_time = 0, now, delta_t;
-char buf1[MAX_BUF];
 
 void mqtt_publish_statistics(void) {
   JsonDocument doc;
   String jsonString;
+
+  multi_heap_info_t info;
+  heap_caps_get_info(&info, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT); // internal RAM, memory capable to store data or to create new task
+  doc["mem"]["total_free"] =  info.total_free_bytes;   // total currently free in all non-continues blocks
+  doc["mem"]["min_free"] = info.minimum_free_bytes;  // minimum free ever
+  doc["mem"]["lrgst_free_blk"] = info.largest_free_block;   // largest continues block to allocate big array
 
   doc["time"] = millis();
   doc["log"]["reallocationCount"] = qtklog.getReallocationCount();
@@ -249,31 +248,10 @@ void mqtt_publish_statistics(void) {
   doc["max31855"]["highWaterMark"] = kiln_thermo->getTaskHighWaterMark();
   doc["max6675"]["highWaterMark"] = housing_thermo->getTaskHighWaterMark();
   doc["program"]["highWaterMark"] = program.getTaskHighWaterMark();
+  doc["pwm"]["highWaterMark"] = PWM.getTaskHighWaterMark();
+  doc["mqtt"]["highWaterMark"] = MQTT.getTaskHighWaterMark();
 
-  serializeJson(doc, jsonString);
-  snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_STATE);
-  mqtt_cli->publish(buf1, jsonString);
-}
 
-void mqtt_publish_state(bool active, bool pid_current) {
-  JsonDocument doc;
-  String jsonString;
-
-  doc["kiln"]["time_ms"] = kiln_thermo->lastTime();
-  doc["kiln"]["temperature_C"] = kiln_thermo->getTemperatureC();
-  doc["housing"]["time_ms"] = housing_thermo->lastTime();
-  doc["housing"]["temperature_C"] = housing_thermo->getTemperatureC();
-  if (pid_enabled || active) {
-    doc["pidEnabled"] = pid_enabled;
-    doc["targetTemperatureC"] = targetTemperatureC;
-    doc["dutyCycle"] = 100. * (double)pid_output / (double)config.pwmWindow_ms;
-  }
-  if (pid_enabled || pid_current) {
-    double Kp = pid->GetKp(), Ki = pid->GetKi(), Kd = pid->GetKd();
-    doc["pid"]["Kp"] = Kp;
-    doc["pid"]["Ki"] = Ki;
-    doc["pid"]["Kd"] = Kd;
-  }
   serializeJson(doc, jsonString);
   snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_STATE);
   mqtt_cli->publish(buf1, jsonString);
@@ -298,32 +276,12 @@ void ssr_off(void) {
 }
 
 void loop() {
-  now = millis();
-  if (pid_enabled) {
-    // shift the next start time into the future
-    while (now - pwm_window_start_time > config.pwmWindow_ms) {
-      pwm_window_start_time += config.pwmWindow_ms;
-    }
-    pid_output = pid->Run(kiln_thermo->getTemperatureC());
-    qtklog.debug(QTKLOG_DBG_PRIO_LOW, "pid_output = %d", pid_output);
-    if (now - pwm_window_start_time < pid_output)
-      ssr_on();
-    else
-      ssr_off();
-  }
   // 0.5 is for rounding up
   lcd_update(kiln_thermo->getTemperatureC() + 0.5, ssr_state, ssr_state);
 
   // run handlers for subprocesses
   mqtt_cli->loop();
 
-  now = millis();
-  delta_t = now - last_time;
-  // if we have waited long enough, update the thermos
-  if (delta_t >= config.mqttUpdateInterval_ms) {
-    mqtt_publish_state(false, false);
-    last_time = millis();
-  }
   // do a minimal delay for the PWM and other service loops
   delay(config.min_loop_ms);
 }
@@ -432,7 +390,7 @@ void onConfigMessageReceived(const String &message) {
 // handle mqtt state messages
 void onSetStateMessageReceived(const String &message) {
   JsonDocument doc;
-  double Kp = pid->GetKp(), Ki = pid->GetKi(), Kd = pid->GetKd();
+  double Kp = pwm->getKp(), Ki = pwm->getKi(), Kd = pwm->getKd();
   bool pid_enabled_at_start = pid_enabled;
   bool updateTunings = false;
 

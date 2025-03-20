@@ -24,8 +24,8 @@ class QTKilnThermo
     void enable(void);
     void disable(void);
     bool isEnabled(void);
-    float getTemperatureC(void);
-    unsigned long lastTime(void);
+    float getTemperature_C(void);
+    unsigned long getLastTime(void);
     void thread(void);
     TaskHandle_t getTask(void);
     UBaseType_t getTaskHighWaterMark(void);

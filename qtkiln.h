@@ -14,6 +14,8 @@ void onConfigMessageReceived(const String &message);
 void onStateSetMessageReceived(const String &message);
 void onStateSetMessageReceived(const String &message);
 void lcd_update(uint16_t val, bool bold, bool colon);
+void ssr_on(void);
+void ssr_off(void);
 
 // max typical string buffer
 #define MAX_BUF 256
