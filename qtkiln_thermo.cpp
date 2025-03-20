@@ -1,4 +1,14 @@
 #include "qtkiln_thermo.h"
+#include "qtkiln_log.h"
+
+extern QTKilnLog qtklog;
+
+// use a static function to be the entry point for the task
+void thermoTaskFunction(void *pvParameter) {
+  QTKilnThermo *thermo = static_cast<QTKilnThermo *>(pvParameter);
+
+  thermo->thread();
+}
 
 QTKilnThermo::QTKilnThermo(uint16_t interval_ms, MAX31855 *max31855, MAX6675 *max6675) {
   _interval_ms = interval_ms;
@@ -6,6 +16,7 @@ QTKilnThermo::QTKilnThermo(uint16_t interval_ms, MAX31855 *max31855, MAX6675 *ma
   _max6675 = max6675;
   _lastTime = 0;
   _lastTempC = -1;
+  _taskHandle = NULL;
   if (_max31855 || _max6675) {
     _err = false;
   } else {
@@ -18,21 +29,31 @@ void QTKilnThermo::begin(void) {
   if (_max31855) {
     _max31855->begin();
     while(_max31855->getChipID(MAX31855_FORCE_READ_DATA) != MAX31855_ID) {
-      Serial.println("unable to retrieve ID from MAX31855");
+      qtklog.warn("unable to retrieve ID from MAX31855");
       delay(5000);
     }
-    Serial.println("MAX31855 connection verified");
+    qtklog.print("MAX31855 connection verified");
   } else if (_max6675) {
     _max6675->begin();
     while (_max6675->getChipID(MAX6675_FORCE_READ_DATA) != MAX6675_ID) {
-      Serial.println("unable to detect MAX6675");
+      qtklog.warn("unable to detect MAX6675");
       delay(5000);
     }
-    Serial.println("MAX6675 connection verified");
+    qtklog.print("MAX6675 connection verified");
   } else {
     _err = true;
     _errno = QTKILN_ERRNO_INVALID_TYPE;
   }
+
+  BaseType_t rc = xTaskCreate(taskFunction, (_max31855 ? "max31855" : "max65675"),
+		  QTKILN_THERMO_STACK_SIZE, (void *)this, QTKILN_THERMO_PRI,
+		  &_taskHandle);
+  if (rc != pdPASS || !_taskHandle)
+    qtklog.error("unable to create task handle for %s", (_max31855 ? "max31855" : "max65675"));
+}
+
+void QTKilnThermo::getTask(void) {
+  return _taskHandle;
 }
 
 void QTKilnThermo::enable(void) {
@@ -68,23 +89,23 @@ void QTKilnThermo::_MAX31855_verbose_diagnose(uint8_t code) {
     switch (code)
     {
       case MAX31855_THERMOCOUPLE_SHORT_TO_VCC:
-        Serial.println(F("Thermocouple short to VCC"));
+        qtklog.warn("thermocouple short to VCC");
         break;
 
       case MAX31855_THERMOCOUPLE_SHORT_TO_GND:
-        Serial.println(F("Thermocouple short to GND"));
+        qtklog.warn("thermocouple short to GND");
         break;
 
       case MAX31855_THERMOCOUPLE_NOT_CONNECTED:
-        Serial.println(F("Thermocouple not connected"));
+        qtklog.warn("thermocouple not connected");
         break;
 
       case MAX31855_THERMOCOUPLE_UNKNOWN:
-        Serial.println(F("Thermocouple unknown error"));
+        qtklog.warn("thermocouple unknown error");
         break;
 
       //case MAX31855_THERMOCOUPLE_READ_FAIL:
-       // Serial.println(F("Thermocouple read error, check chip & spi cable"));
+       // qtklog.print("Thermocouple read error, check chip & spi cable");
         //break;
     }
 }
@@ -94,15 +115,18 @@ void QTKilnThermo::_doRead(void) {
     if (_max31855->detectThermocouple(MAX31855_FORCE_READ_DATA) == MAX31855_THERMOCOUPLE_OK) {
       double tmp =_max31855->getTemperature(MAX31855_FORCE_READ_DATA);
       if (tmp != MAX31855_ERROR) {
+	qtklog.debug(0, "max31855 = %g", tmp);
 	_lastTempC = tmp;
     	_lastTime = millis();
       } else {
 	_err = true;
 	_errno = QTKILN_ERRNO_READ_ERROR;
+        qtklog.warn("MAX31855 thermocouple read error");
       }
     } else {
       _err = true;
       _errno = QTKILN_ERRNO_MAX31855_NOT_DETECTED;
+      qtklog.warn("MAX31855 thermocouple not detected");
     }
   } else if (_max6675) {
     double tmp = _max6675->getTemperature(MAX6675_FORCE_READ_DATA);
@@ -112,6 +136,7 @@ void QTKilnThermo::_doRead(void) {
     } else {
       _err = true;
       _errno = QTKILN_ERRNO_READ_ERROR;
+      qtklog.warn("MAX6675 thermocouple not responding");
     }
   } else {
     _err = true;
@@ -119,9 +144,15 @@ void QTKilnThermo::_doRead(void) {
   }
 }
 
-void QTKilnThermo::loop(void) {
-  unsigned long now = millis();
+void QTKilnThermo::_thread(void *pvParameters) {
+  (void)pvParameters;
+  TickType_t xDelay;
 
-  if ((now - _lastTime) >= _interval_ms && _enabled)
-    _doRead();
+  while (1) {
+    if (_enabled) {
+      _doRead();
+    }
+    xDelay = pdMS_TO_TICKS(_interval_ms);
+    vTaskDelay(xDelay);
+  }
 }

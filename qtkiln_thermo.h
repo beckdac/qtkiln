@@ -9,19 +9,25 @@
 #define QTKILN_ERRNO_INVALID_TYPE 2
 #define QTKILN_ERRNO_MAX31855_NOT_DETECTED 3
 
+#define QTKILN_THERMO_TASK_STACK_SIZE 1024
+#define QTKILN_THERMO_TASK_PRI tskIDLE_PRIORITY + 1
+
+extern "C" void thermoTaskFunction(void *pvParameter);
+
 class QTKilnThermo
 {
   public:
     QTKilnThermo(uint16_t interval_ms, MAX31855 *max31855, MAX6675 *max6675);
 
     void begin(void);
-    void loop(void);
     unsigned long msSinceLastUpdate(void);
     void enable(void);
     void disable(void);
     bool isEnabled(void);
     float getTemperatureC(void);
     unsigned long lastTime(void);
+    void thread(void *pvParameters);
+    TaskHandle_t getTask(void);
 
   private:
     void _MAX31855_verbose_diagnose(uint8_t code);
@@ -34,6 +40,7 @@ class QTKilnThermo
     uint8_t _errno = 0;			// what error has occurred
     float _lastTempC = .0;		// last temperature reading in C
     void _doRead(void);			// do the read via the phy
+    TaskHandle_t _taskHandle = NULL;	// for managing the task later
 };
 
 #endif
