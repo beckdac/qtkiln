@@ -14,9 +14,9 @@ extern "C" void mqttTaskFunction(void *pvParameter);
 class QTKilnMQTT
 {
   public:
-    QTKilnMQTT(uint16_t updateInterval_ms);
+    QTKilnMQTT(void);
 
-    void begin(EspMQTTClient *mqttCli);
+    void begin(uint16_t updateInterval_ms, EspMQTTClient *mqttCli);
     unsigned long msSinceLastUpdate(void);
     void enable(void);
     void disable(void);

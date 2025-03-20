@@ -24,10 +24,11 @@ void mqttTaskFunction(void *pvParameter) {
   mqtt->thread();
 }
 
-QTKilnMQTT::QTKilnMQTT(uint16_t updateInterval_ms) {
-  _updateInterval_ms = updateInterval_ms;
+QTKilnMQTT::QTKilnMQTT(void) {
+  _updateInterval_ms = QTKILN_MQTT_DEFAULT_UPDATE_INTERVAL_MS;
   _lastTime = 0;
   _taskHandle = NULL;
+  _targetTemperature_C = 0;
 }
 
 void QTKilnMQTT::setUpdateInterval_ms(uint16_t updateInterval_ms) {
@@ -39,9 +40,10 @@ uint16_t QTKilnMQTT::getUpdateInterval_ms(void) {
   return _updateInterval_ms;
 }
 
-void QTKilnMQTT::begin(EspMQTTClient *mqttCli) {
+void QTKilnMQTT::begin(uint16_t updateInterval_ms, EspMQTTClient *mqttCli) {
   if (!mqttCli)
     qtklog.error("mqtt client passwd to mqtt task was null");
+  _updateInterval_ms = updateInterval_ms;
   _mqttCli = mqttCli;
 
   BaseType_t rc = xTaskCreate(mqttTaskFunction, "mqtt",

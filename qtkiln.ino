@@ -202,7 +202,7 @@ void setup() {
     MQTT_USER, MQTT_PASS, config.mac, MQTT_PORT);
   qtklog.print("MQTT client connected");
   mqttCli->enableDebuggingMessages(config.mqtt_enable_debug_messages);
-  mqtt.begin(mqttCli);
+  mqtt.begin(config.mqttUpdateInterval_ms, mqttCli);
 
   // initialize the thermocouples and get the first readingings
   // kiln
@@ -393,7 +393,7 @@ void onConfigMessageReceived(const String &message) {
 void onSetStateMessageReceived(const String &message) {
   JsonDocument doc;
   double Kp = pwm.getKp(), Ki = pwm.getKi(), Kd = pwm.getKd();
-  bool pid_enabled_at_start = pid_enabled;
+  bool pid_enabled_at_start = pwm.isEnabled();
   bool updateTunings = false;
 
   DeserializationError error = deserializeJson(doc, message);
@@ -407,7 +407,7 @@ void onSetStateMessageReceived(const String &message) {
   // if it turns it off, make sure the ssr is off
   JsonVariant tmpObj = doc[MSG_PID_ENABLED];
   if (!tmpObj.isNull()) {
-    pid_enabled = doc[MSG_PID_ENABLED];
+    bool pid_enabled = doc[MSG_PID_ENABLED];
     if (!pid_enabled && pid_enabled_at_start) {
       pwm.disable();
       qtklog.print("stopping PID control");
@@ -422,26 +422,26 @@ void onSetStateMessageReceived(const String &message) {
       } else if (tmp > TARGET_TEMP_MAX) {
         tmp = TARGET_TEMP_MAX;
       }
-      PWM.setTargetTemperature_C(tmp);
-      if (PWM.isEnabled() && !pid_enabled_at_start) { // pid was off, start it 
-	PWM.enable();
-        qtklog.print("starting PID with target temperature of %d C", PWM.getTargetTemperature_C());
-      } else if (PWM.isEnabled()) { // pid was already enabled, just updating the set point
-        qtklog.print("adjusting current PID target temperature to %d C", targetTemperatureC);
+      pwm.setTargetTemperature_C(tmp);
+      if (pwm.isEnabled() && !pid_enabled_at_start) { // pid was off, start it 
+	pwm.enable();
+        qtklog.print("starting PID with target temperature of %d C", pwm.getTargetTemperature_C());
+      } else if (pwm.isEnabled()) { // pid was already enabled, just updating the set point
+        qtklog.print("adjusting current PID target temperature to %d C", pwm.getTargetTemperature_C());
       } else {
-        qtklog.print("setting PID target temperature to %d C", targetTemperatureC);
+        qtklog.print("setting PID target temperature to %d C", pwm.getTargetTemperature_C());
       }
-    } else if (strcmp(kv.key().c_str(), PREFS_PID_KP) == 0 && pid_enabled) {
+    } else if (strcmp(kv.key().c_str(), PREFS_PID_KP) == 0 && pwm.isEnabled()) {
       Kp = doc[PREFS_PID_KP];
       if (Kp < 0)
         Kp = 0;
       updateTunings = true;
-    } else if (strcmp(kv.key().c_str(), PREFS_PID_KI) == 0 && pid_enabled) {
+    } else if (strcmp(kv.key().c_str(), PREFS_PID_KI) == 0 && pwm.isEnabled()) {
       Ki = doc[PREFS_PID_KI];
       if (Ki < 0)
         Ki = 0;
       updateTunings = true;
-    } else if (strcmp(kv.key().c_str(), PREFS_PID_KD) == 0 && pid_enabled) {
+    } else if (strcmp(kv.key().c_str(), PREFS_PID_KD) == 0 && pwm.isEnabled()) {
       Kd = doc[PREFS_PID_KD];
       if (Kd < 0)
         Kd = 0;
@@ -450,7 +450,7 @@ void onSetStateMessageReceived(const String &message) {
   }
   if (updateTunings) {
     qtklog.print("updating live tunings to (Kp = %g, Ki = %g, Kd = %g)", Kp, Ki, Kd);
-    PWM->setTunings(Kp, Ki, Kd);
+    pwm.setTunings(Kp, Ki, Kd);
   }
 }
 void onGetStateMessageReceived(const String &message) {
