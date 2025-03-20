@@ -26,7 +26,11 @@ QTKilnProgram::QTKilnProgram(void) {
 }
 
 void QTKilnProgram::begin(void) {
-  qtklog.print("program runner initialized");
+  BaseType_t rc = xTaskCreate(programTaskFunction, "program",
+                  QTKILN_PROGRAM_TASK_STACK_SIZE, (void *)this, QTKILN_PROGRAM_TASK_PRI,
+                  &_taskHandle);
+  if (rc != pdPASS || !_taskHandle)
+    qtklog.error("unable to create task handle for program");
 }
 
 void QTKilnProgram::thread(void) {
@@ -211,6 +215,6 @@ void QTKilnProgram::setUpdateInterval_ms(uint16_t updateInterval_ms) {
   qtklog.debug(0, "program update interval modified to %d ms", _updateInterval_ms);
 }
 
-uint16_t QTKilnThermo::getUpdateInterval_ms(void) {
+uint16_t QTKilnProgram::getUpdateInterval_ms(void) {
   return _updateInterval_ms;
 }
