@@ -9,7 +9,7 @@
 #define QTKILN_ERRNO_INVALID_TYPE 2
 #define QTKILN_ERRNO_MAX31855_NOT_DETECTED 3
 
-#define QTKILN_THERMO_TASK_STACK_SIZE 1024
+#define QTKILN_THERMO_TASK_STACK_SIZE 2048
 #define QTKILN_THERMO_TASK_PRI tskIDLE_PRIORITY + 1
 
 extern "C" void thermoTaskFunction(void *pvParameter);
@@ -26,8 +26,9 @@ class QTKilnThermo
     bool isEnabled(void);
     float getTemperatureC(void);
     unsigned long lastTime(void);
-    void thread(void *pvParameters);
+    void thread(void);
     TaskHandle_t getTask(void);
+    UBaseType_t getTaskHighWaterMark(void);
 
   private:
     void _MAX31855_verbose_diagnose(uint8_t code);

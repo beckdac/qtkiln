@@ -255,6 +255,8 @@ void mqtt_publish_state(bool active=false, bool pid_current=false, bool statisti
   if (statistics) {
     doc["log"]["reallocationCount"] = qtklog.getReallocationCount();
     doc["log"]["debugPriorityCutoff"] = qtklog.getDebugPriorityCutoff();
+    doc["max31855"]["highWaterMark"] = kiln_thermo->getTaskHighWaterMark();
+    doc["max6675"]["highWaterMark"] = housing_thermo->getTaskHighWaterMark();
   }
   serializeJson(doc, jsonString);
   snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_STATE);
@@ -297,8 +299,6 @@ void loop() {
   lcd_update(kiln_thermo->getTemperatureC() + 0.5, ssr_state, ssr_state);
 
   // run handlers for subprocesses
-  kiln_thermo->loop();
-  housing_thermo->loop();
   mqtt_cli->loop();
 
   now = millis();

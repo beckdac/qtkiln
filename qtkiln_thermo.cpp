@@ -45,14 +45,14 @@ void QTKilnThermo::begin(void) {
     _errno = QTKILN_ERRNO_INVALID_TYPE;
   }
 
-  BaseType_t rc = xTaskCreate(taskFunction, (_max31855 ? "max31855" : "max65675"),
-		  QTKILN_THERMO_STACK_SIZE, (void *)this, QTKILN_THERMO_PRI,
+  BaseType_t rc = xTaskCreate(thermoTaskFunction, (_max31855 ? "max31855" : "max65675"),
+		  QTKILN_THERMO_TASK_STACK_SIZE, (void *)this, QTKILN_THERMO_TASK_PRI,
 		  &_taskHandle);
   if (rc != pdPASS || !_taskHandle)
     qtklog.error("unable to create task handle for %s", (_max31855 ? "max31855" : "max65675"));
 }
 
-void QTKilnThermo::getTask(void) {
+TaskHandle_t QTKilnThermo::getTask(void) {
   return _taskHandle;
 }
 
@@ -115,7 +115,7 @@ void QTKilnThermo::_doRead(void) {
     if (_max31855->detectThermocouple(MAX31855_FORCE_READ_DATA) == MAX31855_THERMOCOUPLE_OK) {
       double tmp =_max31855->getTemperature(MAX31855_FORCE_READ_DATA);
       if (tmp != MAX31855_ERROR) {
-	qtklog.debug(0, "max31855 = %g", tmp);
+	qtklog.debug(QTKLOG_DBG_PRIO_LOW, "max31855 = %g", tmp);
 	_lastTempC = tmp;
     	_lastTime = millis();
       } else {
@@ -131,6 +131,7 @@ void QTKilnThermo::_doRead(void) {
   } else if (_max6675) {
     double tmp = _max6675->getTemperature(MAX6675_FORCE_READ_DATA);
     if (tmp != MAX6675_ERROR) {
+      qtklog.debug(QTKLOG_DBG_PRIO_LOW, "max6675 = %g", tmp);
       _lastTempC = tmp;
       _lastTime = millis();
     } else {
@@ -144,8 +145,7 @@ void QTKilnThermo::_doRead(void) {
   }
 }
 
-void QTKilnThermo::_thread(void *pvParameters) {
-  (void)pvParameters;
+void QTKilnThermo::thread(void) {
   TickType_t xDelay;
 
   while (1) {
@@ -155,4 +155,11 @@ void QTKilnThermo::_thread(void *pvParameters) {
     xDelay = pdMS_TO_TICKS(_interval_ms);
     vTaskDelay(xDelay);
   }
+}
+
+UBaseType_t QTKilnThermo::getTaskHighWaterMark(void) {
+  if (_taskHandle)
+    return uxTaskGetStackHighWaterMark(_taskHandle);
+  qtklog.warn("no task associated with qtkiln thermo in high watermark test");
+  return 0;
 }
