@@ -41,7 +41,7 @@ uint16_t QTKilnMQTT::getUpdateInterval_ms(void) {
 
 void QTKilnMQTT::begin(EspMQTTClient *mqttCli) {
   if (!mqttCli)
-    qtkiln.error("mqtt client passwd to mqtt task was null");
+    qtklog.error("mqtt client passwd to mqtt task was null");
   _mqttCli = mqttCli;
 
   BaseType_t rc = xTaskCreate(mqttTaskFunction, "mqtt",
@@ -105,7 +105,7 @@ void QTKilnMQTT::thread(void) {
 
   while (1) {
     if (_enabled) {
-      _publish_state(false, false)
+      _publish_state(false, false);
     }
     xDelay = pdMS_TO_TICKS(_updateInterval_ms);
     vTaskDelay(xDelay);

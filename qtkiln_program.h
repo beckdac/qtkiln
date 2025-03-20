@@ -13,6 +13,8 @@
 #define QTKILN_PROGRAM_TASK_STACK_SIZE 2048
 #define QTKILN_PROGRAM_TASK_PRI tskIDLE_PRIORITY + 3
 
+#define QTKILN_PROGRAM_DEFAULT_UPDATE_INTERVAL_MS 1000
+
 extern "C" void programTaskFunction(void *pvParameter);
 
 struct QTKilnProgramStructStep {

@@ -12,6 +12,8 @@
 #define QTKILN_THERMO_TASK_STACK_SIZE 1024+512
 #define QTKILN_THERMO_TASK_PRI tskIDLE_PRIORITY + 1
 
+#define QTKILN_THERMO_DEFAULT_UPDATE_INTERVAL_MS 250
+
 extern "C" void thermoTaskFunction(void *pvParameter);
 
 class QTKilnThermo

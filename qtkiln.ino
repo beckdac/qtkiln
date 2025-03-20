@@ -39,12 +39,12 @@ const char *sspw = WIFI_PASS;
 // MQTT server
 #include "mqtt_cred.h"
 EspMQTTClient *mqttCli = NULL;
-QTKilnMQTT mqtt();
+QTKilnMQTT mqtt;
 
 // PWM object
 #define SSR_PIN 8
 bool ssr_state = false;
-QTKilnPWM pwm;
+QTKilnPWM pwm(QTKILN_PWM_DEFAULT_WINDOW_SIZE);
 
 // LCD
 #define LCD_CLK 1
@@ -190,7 +190,6 @@ void setup() {
   // always turn it off incase we are coming back from a reset
   digitalWrite(SSR_PIN, LOW);
   qtklog.print("PWM cycle window in ms is %d", config.pwmWindow_ms);
-  pwm_window_start_time = millis();
 
   // setup PID
   pwm.begin();
@@ -216,12 +215,12 @@ void setup() {
   housing_thermo->enable();
   // get the readings
   qtklog.print("kiln = %g C and housing = %g C",
-        kiln_thermo->getTemperatureC(),
-  	housing_thermo->getTemperatureC());
+        kiln_thermo->getTemperature_C(),
+  	housing_thermo->getTemperature_C());
 
   // lcd setup
   // 0.5 is for rounding up
-  lcd_update(kiln_thermo->getTemperatureC() + 0.5, false, false);
+  lcd_update(kiln_thermo->getTemperature_C() + 0.5, false, false);
 }
 
 void lcd_update(uint16_t val, bool bold, bool colon) {
@@ -251,8 +250,8 @@ void mqtt_publish_statistics(void) {
   doc["max31855"]["highWaterMark"] = kiln_thermo->getTaskHighWaterMark();
   doc["max6675"]["highWaterMark"] = housing_thermo->getTaskHighWaterMark();
   doc["program"]["highWaterMark"] = program.getTaskHighWaterMark();
-  doc["pwm"]["highWaterMark"] = PWM.getTaskHighWaterMark();
-  doc["mqtt"]["highWaterMark"] = MQTT.getTaskHighWaterMark();
+  doc["pwm"]["highWaterMark"] = pwm.getTaskHighWaterMark();
+  doc["mqtt"]["highWaterMark"] = mqtt.getTaskHighWaterMark();
 
 
   serializeJson(doc, jsonString);
@@ -280,7 +279,7 @@ void ssr_off(void) {
 
 void loop() {
   // 0.5 is for rounding up
-  lcd_update(kiln_thermo->getTemperatureC() + 0.5, ssr_state, ssr_state);
+  lcd_update(kiln_thermo->getTemperature_C() + 0.5, ssr_state, ssr_state);
 
   // run handlers for subprocesses
   mqttCli->loop();
@@ -393,7 +392,7 @@ void onConfigMessageReceived(const String &message) {
 // handle mqtt state messages
 void onSetStateMessageReceived(const String &message) {
   JsonDocument doc;
-  double Kp = pwm->getKp(), Ki = pwm->getKi(), Kd = pwm->getKd();
+  double Kp = pwm.getKp(), Ki = pwm.getKi(), Kd = pwm.getKd();
   bool pid_enabled_at_start = pid_enabled;
   bool updateTunings = false;
 
@@ -410,7 +409,7 @@ void onSetStateMessageReceived(const String &message) {
   if (!tmpObj.isNull()) {
     pid_enabled = doc[MSG_PID_ENABLED];
     if (!pid_enabled && pid_enabled_at_start) {
-      PWM.disable();
+      pwm.disable();
       qtklog.print("stopping PID control");
     }
   }
@@ -471,6 +470,4 @@ void onConnectionEstablished(void) {
   mqttCli->subscribe(topic, onGetStateMessageReceived);
   snprintf(topic, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_SET);
   mqttCli->subscribe(topic, onSetStateMessageReceived);
-
-  mqtt_publish_state(false, false);
 }

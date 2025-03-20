@@ -7,6 +7,8 @@
 #define QTKILN_PWM_TASK_STACK_SIZE 2048
 #define QTKILN_PWM_TASK_PRI tskIDLE_PRIORITY + 2
 
+#define QTKILN_PWM_DEFAULT_WINDOW_SIZE 5000
+
 extern "C" void pwmTaskFunction(void *pvParameter);
 
 class QTKilnPWM

@@ -2,9 +2,12 @@
 #define QTKILN_MQTT_H
 
 #include "Arduino.h"
+#include "EspMQTTClient.h"
 
 #define QTKILN_MQTT_TASK_STACK_SIZE 2048
 #define QTKILN_MQTT_TASK_PRI tskIDLE_PRIORITY + 2
+
+#define QTKILN_MQTT_DEFAULT_MQTT_UPDATE_INTERVAL_MS 1000
 
 extern "C" void mqttTaskFunction(void *pvParameter);
 
@@ -31,7 +34,7 @@ class QTKilnMQTT
     unsigned long _lastTime = 0;	// the last time the system was updated
     bool _enabled = false;		// is the system running
     TaskHandle_t _taskHandle = NULL;	// for managing the task later
-    EspMQTTClient *_mqttClie = NULL;	// pubsub thing
+    EspMQTTClient *_mqttCli = NULL;	// pubsub thing
 };
 
 #endif

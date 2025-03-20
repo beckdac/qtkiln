@@ -55,6 +55,7 @@ void QTKilnPWM::enable(void) {
     _pid->SetTunings(config.Kp, config.Ki, config.Kd);
     _pid->SetSampleTime(_windowSize_ms);
     _pid->Start(kiln_thermo->getTemperature_C(), 0, _targetTemperature_C);
+    _windowStartTime = millis();
     qtklog.debug(0, "PID is being enabled for the PWM task");
   }
 }

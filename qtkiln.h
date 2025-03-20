@@ -36,7 +36,7 @@ struct Config {
   uint16_t thermoUpdateInterval_ms = 250;
   uint16_t pwmWindow_ms = 5000;
   uint16_t mqttUpdateInterval_ms = 1000;
-  uint16_t programUpdateInterval_ms = 10000;
+  uint16_t programUpdateInterval_ms = 1000;
   bool mqtt_enable_debug_messages = false;
   uint8_t min_loop_ms = 5;
   double Kp = PID_KP, Ki = PID_KI, Kd = PID_KD;
