@@ -33,9 +33,10 @@ class QTKilnPWM
     double getKp(void);
     double getKi(void);
     double getKd(void);
-    void setKp(double);
-    void setKi(double);
-    void setKd(double);
+    void setKp(double Kp);
+    void setKi(double Ki);
+    void setKd(double Kd);
+    void setTunings(double Kp, double Ki, double Kd);
 
   private:
     unsigned long _windowStartTime = 0; // start of this next PWM window

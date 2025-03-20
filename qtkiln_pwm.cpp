@@ -5,6 +5,7 @@
 
 #include <PID_v2.h>
 
+extern Config config;
 extern QTKilnLog qtklog;
 extern QTKilnThermo *kiln_thermo;
 extern QTKilnThermo *housing_thermo;
@@ -24,7 +25,7 @@ QTKilnPWM::QTKilnPWM(uint16_t windowSize_ms) {
 
 void QTKilnPWM::setUpdateInterval_ms(uint16_t windowSize_ms) {
   _windowSize_ms = windowSize_ms;
-  pid->SetOutputLimits(0, _windowSize_ms);
+  _pid->SetOutputLimits(0, _windowSize_ms);
   qtklog.debug(0, "pwm update interval modified to %d ms", _windowSize_ms);
 }
 

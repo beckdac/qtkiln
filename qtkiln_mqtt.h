@@ -17,6 +17,7 @@ class QTKilnMQTT
     unsigned long msSinceLastUpdate(void);
     void enable(void);
     void disable(void);
+    bool isEnabled(void);
     void thread(void);
     unsigned long getLastTime(void);
     TaskHandle_t getTask(void);
