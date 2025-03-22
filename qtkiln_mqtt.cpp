@@ -45,9 +45,13 @@ void QTKilnMQTT::begin(uint16_t updateInterval_ms, EspMQTTClient *mqttCli) {
   _updateInterval_ms = updateInterval_ms;
   _mqttCli = mqttCli;
 
-  BaseType_t rc = xTaskCreate(mqttTaskFunction, "mqtt",
+  _mqttCli->setMaxPacketSize(8192);
+  //_mqttCli->setMaxOutPacketSize(8192);
+
+  // start on core 1 which means no need for mutex since all tasks callin this are too
+  BaseType_t rc = xTaskCreatePinnedToCore(mqttTaskFunction, "mqtt",
 		  QTKILN_MQTT_TASK_STACK_SIZE, (void *)this, QTKILN_MQTT_TASK_PRI,
-		  &_taskHandle);
+		  &_taskHandle, QTKILN_TASK_CORE);
   if (rc != pdPASS || !_taskHandle)
     qtklog.error("unable to create task handle for mqtt");
 }
@@ -82,13 +86,13 @@ void QTKilnMQTT::_publish_state(bool active, bool pid_current) {
   String jsonString;
 
   doc["kiln"]["time_ms"] = kiln_thermo->getLastTime();
-  doc["kiln"]["temperature_C"] = kiln_thermo->getTemperature_C();
+  doc["kiln"]["temp_C"] = kiln_thermo->getTemperature_C();
   doc["housing"]["time_ms"] = housing_thermo->getLastTime();
-  doc["housing"]["temperature_C"] = housing_thermo->getTemperature_C();
+  doc["housing"]["temp_C"] = housing_thermo->getTemperature_C();
   if (pwm.isEnabled() || active) {
     doc["pidEnabled"] = pwm.isEnabled();
-    doc["targetTemperatureC"] = pwm.getTargetTemperature_C();
-    doc["dutyCycle"] = pwm.getDutyCycle();
+    doc["targetTemp_C"] = pwm.getTargetTemperature_C();
+    doc["dutyCycle_%"] = pwm.getDutyCycle();
   }
   if (pwm.isEnabled() || pid_current) {
     double Kp = pwm.getKp(), Ki = pwm.getKi(), Kd = pwm.getKd();

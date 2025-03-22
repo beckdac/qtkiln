@@ -25,6 +25,7 @@ void ssr_off(void);
 #define PID_KI 0.2
 #define PID_KD 0.1
 
+#define QTKILN_TASK_CORE 0
 // config structure used by all the modules
 #define MAX_CFG_STR 32
 #define MAC_DEFAULT "c0:ff:ee:ca:fe:42"
@@ -38,7 +39,7 @@ struct Config {
   uint16_t mqttUpdateInterval_ms = 1000;
   uint16_t programUpdateInterval_ms = 1000;
   bool mqtt_enable_debug_messages = false;
-  uint8_t min_loop_ms = 5;
+  uint8_t mainLoop_ms = 5;
   double Kp = PID_KP, Ki = PID_KI, Kd = PID_KD;
 };
 
@@ -51,11 +52,12 @@ struct Config {
 #define MQTT_TOPIC_BASE "qtkiln"
 #define MQTT_TOPIC_STATE "state"
 #define MQTT_TOPIC_CONFIG "config"
+#define MQTT_TOPIC_PROGRAM "program"
 #define MQTT_TOPIC_SET "set"
 #define MQTT_TOPIC_GET "get"
 
-#define MSG_TEMP "temperature_C"
-#define MSG_TARGET_TEMP "targetTemperature_C"
+#define MSG_TEMP "temp_C"
+#define MSG_TARGET_TEMP "targetTemp_C"
 #define MSG_PID_ENABLED "pidEnabled"
 
 // configuration
@@ -64,6 +66,7 @@ struct Config {
 // preferences and json names
 #define PREFS_CONFIG_JSON "config.json"
 #define CONFIG_RESET "reset"
+#define CONFIG_SAVE "save"
 #define PREFS_NAMESPACE MQTT_TOPIC_BASE
 #define PREFS_PID_KP "Kp"
 #define PREFS_PID_KI "Ki"

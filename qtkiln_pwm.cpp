@@ -23,23 +23,24 @@ QTKilnPWM::QTKilnPWM(uint16_t windowSize_ms) {
   _taskHandle = NULL;
 }
 
-void QTKilnPWM::setUpdateInterval_ms(uint16_t windowSize_ms) {
+void QTKilnPWM::setWindowSize_ms(uint16_t windowSize_ms) {
   _windowSize_ms = windowSize_ms;
   _pid->SetOutputLimits(0, _windowSize_ms);
   qtklog.debug(0, "pwm update interval modified to %d ms", _windowSize_ms);
 }
 
-uint16_t QTKilnPWM::getUpdateInterval_ms(void) {
+uint16_t QTKilnPWM::getWindowSize_ms(void) {
   return _windowSize_ms;
 }
 
 void QTKilnPWM::begin(void) {
+  qtklog.print("intializing new pid/pwm with window size %d", _windowSize_ms);
   _pid = new PID_v2(config.Kp, config.Ki, config.Kd, PID::Direct);
   _pid->SetOutputLimits(0, config.pwmWindow_ms);
 
-  BaseType_t rc = xTaskCreate(pwmPWMFunction, "pwm",
+  BaseType_t rc = xTaskCreatePinnedToCore(pwmPWMFunction, "pwm",
 		  QTKILN_PWM_TASK_STACK_SIZE, (void *)this, QTKILN_PWM_TASK_PRI,
-		  &_taskHandle);
+		  &_taskHandle, QTKILN_TASK_CORE);
   if (rc != pdPASS || !_taskHandle)
     qtklog.error("unable to create task handle for pwm");
 }
@@ -109,7 +110,7 @@ void QTKilnPWM::thread(void) {
       else
         ssr_off();
     }
-    xDelay = pdMS_TO_TICKS(_windowSize_ms);
+    xDelay = pdMS_TO_TICKS(_updateInterval_ms);
     vTaskDelay(xDelay);
   }
 }
@@ -135,4 +136,12 @@ double QTKilnPWM::getKd(void) {
 
 void QTKilnPWM::setTunings(double Kp, double Ki, double Kd) {
   _pid->SetTunings(Kp, Ki, Kd);
+}
+
+void QTKilnPWM::setUpdateInterval_ms(uint16_t updateInterval_ms) {
+  _updateInterval_ms = updateInterval_ms;
+}
+
+uint16_t QTKilnPWM::getUpdateInterval_ms(void) {
+  return _updateInterval_ms;
 }

@@ -26,9 +26,10 @@ QTKilnProgram::QTKilnProgram(void) {
 }
 
 void QTKilnProgram::begin(void) {
-  BaseType_t rc = xTaskCreate(programTaskFunction, "program",
+  // put this task on cpu 1 which is where everything else is for simplicity
+  BaseType_t rc = xTaskCreatePinnedToCore(programTaskFunction, "program",
                   QTKILN_PROGRAM_TASK_STACK_SIZE, (void *)this, QTKILN_PROGRAM_TASK_PRI,
-                  &_taskHandle);
+                  &_taskHandle, QTKILN_TASK_CORE);
   if (rc != pdPASS || !_taskHandle)
     qtklog.error("unable to create task handle for program");
 }
@@ -77,12 +78,11 @@ struct QTKilnProgramStruct *QTKilnProgram::_parseProgram(const String &program) 
   QTKilnProgramStruct *new_program = (QTKilnProgramStruct *)malloc(sizeof(struct QTKilnProgramStruct));
   new_program->steps = steps;
   new_program->step = (QTKilnProgramStructStep *)malloc(sizeof(struct QTKilnProgramStructStep) * steps);
+  memset(new_program->step, 0, sizeof(struct QTKilnProgramStructStep));
   // parse the individual steps out of the document
   for (int i = 0; i < steps; ++i) {
-    memset(new_program->step, 0, sizeof(struct QTKilnProgramStructStep));
     // find the target temperature for this step
-    JsonVariant tmpObj = doc[i + 1][PGM_TARGET_TEMP];
-    if (tmpObj.isNull()) {
+    if (!doc[i+1][PGM_TARGET_TEMP].is<uint16_t>()){
       qtklog.warn("failed to parse program at step %d because the target temperature was missing", i+1);
       free(new_program->step);
       free(new_program);
@@ -90,8 +90,7 @@ struct QTKilnProgramStruct *QTKilnProgram::_parseProgram(const String &program) 
     }
     new_program->step[i].targetTemperature_C = doc[i + 1][PGM_TARGET_TEMP];
     // set up the transition time
-    tmpObj = doc[i + 1][PGM_TRANS_WINDOW_MIN];
-    if (tmpObj.isNull()) {
+    if (!doc[i+1][PGM_TRANS_WINDOW_MIN].is<uint16_t>()){
       new_program->step[i].asFastAsPossible = doc[i + 1][PGM_AFAP] | false;
       // no transition window time and not AFAP, something is wrong
       if (!new_program->step[i].asFastAsPossible) {
@@ -130,7 +129,7 @@ void QTKilnProgram::set(const String &name, const String &program){
     qtklog.print("saving program %s to memory with contents %s", name.c_str(), program.c_str());
     _saveProgram(name, program);
   } else {
-    qtklog.warn("unabled to save program %s because it failed verification", name);
+    qtklog.warn("unabled to save program %s because it failed verification", name.c_str());
   }
 }
 

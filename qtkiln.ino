@@ -87,6 +87,8 @@ void configLoad(const String &jsonString) {
   if (doc[CONFIG_RESET] | false) {
     configReset();
     esp_restart();
+  } else if (doc[CONFIG_SAVE] | false) {
+    configUpdatePrefs();
   }
 }
 
@@ -189,7 +191,6 @@ void setup() {
   pinMode(SSR_PIN, OUTPUT);
   // always turn it off incase we are coming back from a reset
   digitalWrite(SSR_PIN, LOW);
-  qtklog.print("PWM cycle window in ms is %d", config.pwmWindow_ms);
 
   // setup PID
   pwm.begin();
@@ -237,25 +238,46 @@ void lcd_update(uint16_t val, bool bold, bool colon) {
 
 // state or preallocated variables for loop
 
-void mqtt_publish_statistics(void) {
+void mqtt_publish_process_statistics(void) {
   JsonDocument doc;
   String jsonString;
 
   //multi_heap_info_t info;
-  //heap_caps_get_info(&info, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT); // internal RAM, memory capable to store data or to create new task
-  //doc["mem"]["total_free"] =  info.total_free_bytes;   // total currently free in all non-continues blocks
-  //doc["mem"]["min_free"] = info.minimum_free_bytes;  // minimum free ever
-  //doc["mem"]["lrgst_free_blk"] = info.largest_free_block;   // largest continues block to allocate big array
+  doc["time"] = millis();
+  doc["max31855"]["highWaterMark"] = kiln_thermo->getTaskHighWaterMark();
+  doc["max6675"]["highWaterMark"] = housing_thermo->getTaskHighWaterMark();
+  doc["program"]["highWaterMark"] = program.getTaskHighWaterMark();
+  doc["pwm"]["highWaterMark"] = pwm.getTaskHighWaterMark();
+  doc["mqtt"]["highWaterMark"] = mqtt.getTaskHighWaterMark();
+
+  serializeJson(doc, jsonString);
+  snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_STATE);
+  mqttCli->publish(buf1, jsonString);
+}
+void mqtt_publish_memory_statistics(void) {
+  JsonDocument doc;
+  String jsonString;
+  multi_heap_info_t info;
+
+  //multi_heap_info_t info;
+  doc["time"] = millis();
+  heap_caps_get_info(&info, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT); // internal RAM, memory capable to store data or to create new task
+  doc["mem"]["total_free"] =  info.total_free_bytes;   // total currently free in all non-continues blocks
+  doc["mem"]["min_free"] = info.minimum_free_bytes;  // minimum free ever
+  doc["mem"]["lrgst_free_blk"] = info.largest_free_block;   // largest continues block to allocate big array
+
+  serializeJson(doc, jsonString);
+  snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_STATE);
+  mqttCli->publish(buf1, jsonString);
+}
+
+void mqtt_publish_statistics(void) {
+  JsonDocument doc;
+  String jsonString;
 
   doc["time"] = millis();
   doc["log"]["reallocationCount"] = qtklog.getReallocationCount();
   doc["log"]["debugPriorityCutoff"] = qtklog.getDebugPriorityCutoff();
-  doc["max31855"]["highWaterMark"] = kiln_thermo->getTaskHighWaterMark();
-  doc["max6675"]["highWaterMark"] = housing_thermo->getTaskHighWaterMark();
-  //doc["program"]["highWaterMark"] = program.getTaskHighWaterMark();
-  //doc["pwm"]["highWaterMark"] = pwm.getTaskHighWaterMark();
-  doc["mqtt"]["highWaterMark"] = mqtt.getTaskHighWaterMark();
-
 
   serializeJson(doc, jsonString);
   snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_STATE);
@@ -280,15 +302,19 @@ void ssr_off(void) {
   }
 }
 
+// main loop, this is a freertos task
 void loop() {
-  // 0.5 is for rounding up
-  lcd_update(kiln_thermo->getTemperature_C() + 0.5, ssr_state, ssr_state);
+  TickType_t xDelay;
 
-  // run handlers for subprocesses
-  mqttCli->loop();
+  while (1) {
+    // 0.5 is for rounding up
+    lcd_update(kiln_thermo->getTemperature_C() + 0.5, ssr_state, ssr_state);
+    // run handlers for subprocesses 
+    mqttCli->loop();
 
-  // do a minimal delay for the PWM and other service loops
-  delay(config.min_loop_ms);
+    xDelay = pdMS_TO_TICKS(config.mainLoop_ms);
+    vTaskDelay(xDelay);
+  }
 }
 
 // set configuration variables after checking them
@@ -344,6 +370,7 @@ void config_set_mqttUpdateInterval_ms(uint16_t mqttUpdateInterval_ms) {
     mqttUpdateInterval_ms = MQTT_MAX_UPDATE_MS;
   }
   config.mqttUpdateInterval_ms = mqttUpdateInterval_ms;
+  mqtt.setUpdateInterval_ms(config.mqttUpdateInterval_ms);
   qtklog.print("mqtt update interval  = %d ms", config.mqttUpdateInterval_ms);
 }
 void config_set_mqtt_enable_debug_messages(bool enable_messages) {
@@ -396,7 +423,7 @@ void onConfigMessageReceived(const String &message) {
 void onSetStateMessageReceived(const String &message) {
   JsonDocument doc;
   double Kp = pwm.getKp(), Ki = pwm.getKi(), Kd = pwm.getKd();
-  bool pid_enabled_at_start = pwm.isEnabled();
+  bool pidEnabledAtStart = pwm.isEnabled(), startPid = false;
   bool updateTunings = false;
 
   DeserializationError error = deserializeJson(doc, message);
@@ -410,10 +437,12 @@ void onSetStateMessageReceived(const String &message) {
   // if it turns it off, make sure the ssr is off
   JsonVariant tmpObj = doc[MSG_PID_ENABLED];
   if (!tmpObj.isNull()) {
-    bool pid_enabled = doc[MSG_PID_ENABLED];
-    if (!pid_enabled && pid_enabled_at_start) {
+    bool pidEnabled = doc[MSG_PID_ENABLED];
+    if (!pidEnabled && pidEnabledAtStart) {
       pwm.disable();
       qtklog.print("stopping PID control");
+    } else if (pidEnabled && !pidEnabledAtStart) {
+      startPid = true;
     }
   }
   // go through the keys and handle each
@@ -426,10 +455,7 @@ void onSetStateMessageReceived(const String &message) {
         tmp = TARGET_TEMP_MAX;
       }
       pwm.setTargetTemperature_C(tmp);
-      if (pwm.isEnabled() && !pid_enabled_at_start) { // pid was off, start it 
-	pwm.enable();
-        qtklog.print("starting PID with target temperature of %d C", pwm.getTargetTemperature_C());
-      } else if (pwm.isEnabled()) { // pid was already enabled, just updating the set point
+      if (pwm.isEnabled()) { // pid was already enabled, just updating the set point
         qtklog.print("adjusting current PID target temperature to %d C", pwm.getTargetTemperature_C());
       } else {
         qtklog.print("setting PID target temperature to %d C", pwm.getTargetTemperature_C());
@@ -451,18 +477,53 @@ void onSetStateMessageReceived(const String &message) {
       updateTunings = true;
     }
   }
+  if (startPid) {
+      pwm.enable();
+      qtklog.print("starting PID with target temperature of %d C", pwm.getTargetTemperature_C());
+  }
   if (updateTunings) {
     qtklog.print("updating live tunings to (Kp = %g, Ki = %g, Kd = %g)", Kp, Ki, Kd);
     pwm.setTunings(Kp, Ki, Kd);
   }
 }
 void onGetStateMessageReceived(const String &message) {
-  if (strcmp(message.c_str(), "statistics") == 0) {
+  JsonDocument doc;
+
+  DeserializationError error = deserializeJson(doc, message);
+
+  if (error) {
+    qtklog.warn("deserializeJson() failed: %s", error.c_str());
+    return;
+  }
+  // if it has a name object then we are setting the program
+  if (doc["statistics"] | false) {
     mqtt_publish_statistics();
     qtklog.print("statistics requested via mqtt");
   }
+  if (doc["memory_statistics"] | false) {
+    mqtt_publish_memory_statistics();
+    qtklog.print("memory statistics requested via mqtt");
+  }
+  if (doc["process_statistics"] | false) {
+    mqtt_publish_process_statistics();
+    qtklog.print("process_statistics requested via mqtt");
+  }
 }
+void onProgramMessageReceived(const String &message) {
+  JsonDocument doc;
 
+  DeserializationError error = deserializeJson(doc, message);
+
+  if (error) {
+    qtklog.warn("deserializeJson() failed: %s", error.c_str());
+    return;
+  }
+  // if it has a name object then we are setting the program
+  if (doc["name"].is<const char*>()) {
+  	String name = doc["name"];
+	program.set(name, message);
+  }
+}
 // when the connection to the mqtt has completed
 void onConnectionEstablished(void) {
   char topic[MAX_BUF];
@@ -471,6 +532,8 @@ void onConnectionEstablished(void) {
   mqttCli->subscribe(topic, onConfigMessageReceived);
   snprintf(topic, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_GET);
   mqttCli->subscribe(topic, onGetStateMessageReceived);
+  snprintf(topic, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_PROGRAM);
+  mqttCli->subscribe(topic, onProgramMessageReceived);
   snprintf(topic, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_SET);
   mqttCli->subscribe(topic, onSetStateMessageReceived);
 }

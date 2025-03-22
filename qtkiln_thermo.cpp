@@ -1,5 +1,6 @@
 #include "qtkiln_thermo.h"
 #include "qtkiln_log.h"
+#include "qtkiln.h"
 
 extern QTKilnLog qtklog;
 
@@ -54,9 +55,10 @@ void QTKilnThermo::begin(void) {
     _errno = QTKILN_ERRNO_INVALID_TYPE;
   }
 
-  BaseType_t rc = xTaskCreate(thermoTaskFunction, (_max31855 ? "max31855" : "max65675"),
+  // start on core 1
+  BaseType_t rc = xTaskCreatePinnedToCore(thermoTaskFunction, (_max31855 ? "max31855" : "max65675"),
 		  QTKILN_THERMO_TASK_STACK_SIZE, (void *)this, QTKILN_THERMO_TASK_PRI,
-		  &_taskHandle);
+		  &_taskHandle, QTKILN_TASK_CORE);
   if (rc != pdPASS || !_taskHandle)
     qtklog.error("unable to create task handle for %s", (_max31855 ? "max31855" : "max65675"));
 }

@@ -27,8 +27,8 @@ class QTKilnPWM
     void thread(void);
     TaskHandle_t getTask(void);
     UBaseType_t getTaskHighWaterMark(void);
-    uint16_t getUpdateInterval_ms(void);
-    void setUpdateInterval_ms(uint16_t windowSize_ms);
+    uint16_t getWindowSize_ms(void);
+    void setWindowSize_ms(uint16_t windowSize_ms);
     void setTargetTemperature_C(uint16_t targetTemperature_C);
     uint16_t getTargetTemperature_C(void);
     float getDutyCycle(void);
@@ -39,8 +39,11 @@ class QTKilnPWM
     void setKi(double Ki);
     void setKd(double Kd);
     void setTunings(double Kp, double Ki, double Kd);
+    void setUpdateInterval_ms(uint16_t updateInterval_ms);
+    uint16_t getUpdateInterval_ms(void);
 
   private:
+    uint16_t _updateInterval_ms = 10;	// how often the pid manager will run, 10ms is the SSR-DA response time
     unsigned long _windowStartTime = 0; // start of this next PWM window
     uint16_t _windowSize_ms = 5000;	// the size of the PWM frequency window in ms
     unsigned long _lastTime = 0;	// the last time the system was updated

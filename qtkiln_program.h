@@ -5,9 +5,9 @@
 
 #define QTPROGRAM_NAMESPACE "qtkiln_pgm"
 
-#define PGM_TARGET_TEMP "targetTemperature_C"
+#define PGM_TARGET_TEMP "tgtT_C"
 #define PGM_AFAP "AFAP"
-#define PGM_TRANS_WINDOW_MIN "transitionWindow_min"
+#define PGM_TRANS_WINDOW_MIN "deltaT_min"
 #define PGM_DWELL_MIN "dwell_min"
 
 #define QTKILN_PROGRAM_TASK_STACK_SIZE 2048
