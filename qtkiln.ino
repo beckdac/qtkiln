@@ -246,15 +246,25 @@ void setup() {
   	housing_thermo->getFilteredTemperature_C());
 
   // lcd setup
-  // 0.5 is for rounding up
-  lcd_update(kiln_thermo->getFilteredTemperature_C() + 0.5, false, false);
+  lcd_update(kiln_thermo->getFilteredTemperature_C(), false, false);
 
   // turn this on at the end
   mqtt.enable();
 }
 
-void lcd_update(uint16_t val, bool bold, bool colon) {
+void lcd_update(float temp, bool bold, bool colon) {
+  // 0.5 is for rounding up
+  uint16_t val = temp + 0.5;
+
+  if (temp < 0) {
+    val = 0;
+    qtklog.warn("negative temperature sent to lcd_update, set to 0");
+  } else if (temp > 9999) {
+    val = 9999;
+    qtklog.warn("max temperature reached, is everything OK");
+  }
   lcd_val = val;
+
   if (bold)
     lcd.setBrightness(7);
   else
@@ -413,8 +423,7 @@ void loop() {
   TickType_t xDelay;
 
   while (1) {
-    // 0.5 is for rounding up
-    lcd_update(kiln_thermo->getFilteredTemperature_C() + 0.5, ssr_state, ssr_state);
+    lcd_update(kiln_thermo->getFilteredTemperature_C(), ssr_state, ssr_state);
     // run handlers for subprocesses 
     mqttCli->loop();
 

@@ -12,7 +12,7 @@ void onConnectionEstablished(void);
 void onConfigMessageReceived(const String &message);
 void onStateSetMessageReceived(const String &message);
 void onStateSetMessageReceived(const String &message);
-void lcd_update(uint16_t val, bool bold, bool colon);
+void lcd_update(float temp, bool bold, bool colon);
 void ssr_on(void);
 void ssr_off(void);
 

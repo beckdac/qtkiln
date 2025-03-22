@@ -9,7 +9,7 @@
 #define QTKILN_ERRNO_INVALID_TYPE 2
 #define QTKILN_ERRNO_MAX31855_NOT_DETECTED 3
 
-#define QTKILN_THERMO_TASK_STACK_SIZE 1024+512
+#define QTKILN_THERMO_TASK_STACK_SIZE 2024+512
 #define QTKILN_THERMO_TASK_PRI tskIDLE_PRIORITY + 1
 
 #define QTKILN_THERMO_DEFAULT_UPDATE_INTERVAL_MS 250
@@ -50,10 +50,10 @@ class QTKilnThermo
     float _lastTemp_C = .0;		// last temperature reading in C
     void _doRead(void);			// do the read via the phy
     struct QTKilnThermoLowPassFilter {
-      float cutoffFrequency_Hz;
-      float prevSample_C;
-      float filtered_C;
-      double ts;
+      float cutoffFrequency_Hz = 1.;
+      float prevSample_C = 0;
+      float filtered_C = 0;
+      double ts = 0;
     } _lowPassFilter;
     void _filter(float sample);		// process a new sample into the filter
     TaskHandle_t _taskHandle = NULL;	// for managing the task later

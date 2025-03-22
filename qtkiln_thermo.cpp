@@ -29,7 +29,7 @@ QTKilnThermo::QTKilnThermo(uint16_t updateInterval_ms, MAX31855 *max31855, MAX66
 
 void QTKilnThermo::setUpdateInterval_ms(uint16_t updateInterval_ms) {
   _updateInterval_ms = updateInterval_ms;
-  qtklog.debug(0, "thermo update interval modified to %d ms", _updateInterval_ms);
+  qtklog.debug(QTKLOG_DBG_PRIO_ALWAYS, "thermo update interval modified to %d ms", _updateInterval_ms);
 }
 
 uint16_t QTKilnThermo::getUpdateInterval_ms(void) {
@@ -73,16 +73,16 @@ TaskHandle_t QTKilnThermo::getTask(void) {
 
 void QTKilnThermo::enable(void) {
   _enabled = true;
-  qtklog.debug(QTKLOG_DBG_PRIO_HIGH, "enabling thermo");
-  delay(100);
-  if (_lastTime == 0)
+  qtklog.debug(QTKLOG_DBG_PRIO_ALWAYS, "enabling thermo");
+  if (_lastTime == 0) {
     _doRead();
-  qtklog.debug(QTKLOG_DBG_PRIO_HIGH, "read thermo done");
-  delay(100);
+    qtklog.debug(QTKLOG_DBG_PRIO_ALWAYS, "read thermo done");
+  }
 }
 
 void QTKilnThermo::disable(void) {
   _enabled = false;
+  qtklog.debug(QTKLOG_DBG_PRIO_ALWAYS, "disabling thermo");
 }
 
 bool QTKilnThermo::isEnabled(void) {
@@ -139,28 +139,32 @@ void QTKilnThermo::_MAX31855_verbose_diagnose(uint8_t code) {
 
 // simple first order low pass filter in Hz
 void QTKilnThermo::_filter(float sample) {
-  double ts = (millis() - _lowPassFilter.ts) * 1000;
+  double ts = (millis() - _lowPassFilter.ts) * 1e-3;
 
-  qtklog.debug(QTKLOG_DBG_PRIO_HIGH, "sample = %g, previous sample = %g", sample, _lowPassFilter.prevSample_C);
+  //qtklog.debug(QTKLOG_DBG_PRIO_LOW, "sample = %.2f, previous sample = %.2f", sample, _lowPassFilter.prevSample_C);
 	
-  float a_0 = -(((ts / 2) * 2 * PI * _lowPassFilter.cutoffFrequency_Hz - 1) 
-		  / ((ts / 2) * 2 * PI * _lowPassFilter.cutoffFrequency_Hz + 1));
-  float b_0 = ((ts / 2) * 2 * PI * _lowPassFilter.cutoffFrequency_Hz) 
-	  	/ (1 + (ts / 2) * 2 * PI * _lowPassFilter.cutoffFrequency_Hz);
+  float a_0 = -(((ts / 2.) * 2. * PI * _lowPassFilter.cutoffFrequency_Hz - 1.) 
+		  / ((ts / 2.) * 2. * PI * _lowPassFilter.cutoffFrequency_Hz + 1.));
+  float b_0 = ((ts / 2.) * 2. * PI * _lowPassFilter.cutoffFrequency_Hz) 
+	  	/ (1. + (ts / 2.) * 2. * PI * _lowPassFilter.cutoffFrequency_Hz);
+
+  //qtklog.debug(QTKLOG_DBG_PRIO_ALWAYS, "a_0 = %g b_0 = %g", a_0, b_0);
 
   _lowPassFilter.filtered_C = a_0 * _lowPassFilter.filtered_C + 
-	  b_0 * _lowPassFilter.prevSample_C + b_0 * _lowPassFilter.prevSample_C;
+	  b_0 * sample + b_0 * sample;
   _lowPassFilter.prevSample_C = sample;
+  //qtklog.debug(QTKLOG_DBG_PRIO_LOW, "sample = %.2f, filtered = %.2f", sample, _lowPassFilter.filtered_C);
   _lowPassFilter.ts = millis();
 }
 
 void QTKilnThermo::_doRead(void) {
-  qtklog.debug(QTKLOG_DBG_PRIO_HIGH, "_doRead()");
+  //qtklog.debug(QTKLOG_DBG_PRIO_ALWAYS, "_doRead()");
   if (_max31855) {
+    //qtklog.debug(QTKLOG_DBG_PRIO_ALWAYS, "_max31855 0x%x", _max31855);
     if (_max31855->detectThermocouple(MAX31855_FORCE_READ_DATA) == MAX31855_THERMOCOUPLE_OK) {
       double tmp =_max31855->getTemperature(MAX31855_FORCE_READ_DATA);
       if (tmp != MAX31855_ERROR) {
-	qtklog.debug(QTKLOG_DBG_PRIO_HIGH, "max31855 = %g", tmp);
+	qtklog.debug(QTKLOG_DBG_PRIO_LOW, "max31855 = %g", tmp);
 	_lastTemp_C = tmp;
     	_lastTime = millis();
       } else {
@@ -176,9 +180,10 @@ void QTKilnThermo::_doRead(void) {
       return;
     }
   } else if (_max6675) {
+    //qtklog.debug(QTKLOG_DBG_PRIO_ALWAYS, "max6675 0x%x", _max6675);
     double tmp = _max6675->getTemperature(MAX6675_FORCE_READ_DATA);
     if (tmp != MAX6675_ERROR) {
-      qtklog.debug(QTKLOG_DBG_PRIO_HIGH, "max6675 = %g", tmp);
+      qtklog.debug(QTKLOG_DBG_PRIO_LOW, "max6675 = %g", tmp);
       _lastTemp_C = tmp;
       _lastTime = millis();
     } else {
