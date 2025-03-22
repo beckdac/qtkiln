@@ -65,6 +65,7 @@ struct Config {
 #define QTKILN_BOOT_DELAY_MS 2000
 // preferences and json names
 #define PREFS_CONFIG_JSON "config.json"
+#define PREFS_PROGRAM_LIST "programs.json"
 #define CONFIG_RESET "reset"
 #define CONFIG_SAVE "save"
 #define PREFS_NAMESPACE MQTT_TOPIC_BASE

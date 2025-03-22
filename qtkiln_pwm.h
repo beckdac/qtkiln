@@ -43,7 +43,8 @@ class QTKilnPWM
     uint16_t getUpdateInterval_ms(void);
 
   private:
-    uint16_t _updateInterval_ms = 10;	// how often the pid manager will run, 10ms is the SSR-DA response time
+    uint16_t _updateInterval_ms = 20;	// how often the pid manager will run
+    					//	10ms is the SSR-DA response time, so twice is minimum
     unsigned long _windowStartTime = 0; // start of this next PWM window
     uint16_t _windowSize_ms = 5000;	// the size of the PWM frequency window in ms
     unsigned long _lastTime = 0;	// the last time the system was updated

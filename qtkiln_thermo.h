@@ -33,6 +33,7 @@ class QTKilnThermo
     UBaseType_t getTaskHighWaterMark(void);
     uint16_t getUpdateInterval_ms(void);
     void setUpdateInterval_ms(uint16_t updateInterval_ms);
+    unsigned int getErrorCount(void);
 
   private:
     void _MAX31855_verbose_diagnose(uint8_t code);
@@ -41,8 +42,8 @@ class QTKilnThermo
     MAX6675 *_max6675;			//	this type
     unsigned long _lastTime = 0;	// the last time the system was updated
     bool _enabled = false;		// is the system running
-    bool _err = false;			// has the system encountered an error
-    uint8_t _errno = 0;			// what error has occurred
+    unsigned int _err = 0;		// count of errors
+    uint8_t _errno = 0;			// what error has occurred last
     float _lastTempC = .0;		// last temperature reading in C
     void _doRead(void);			// do the read via the phy
     TaskHandle_t _taskHandle = NULL;	// for managing the task later

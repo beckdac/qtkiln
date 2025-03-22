@@ -140,6 +140,9 @@ void configUpdatePrefs(void) {
 void setup() {
   uint8_t u8mac[6];
 
+  // no matter what this is the firs thing we do
+  ssr_off();
+
   // initialize the serial for 115200 baud
   Serial.begin(115200);
 
@@ -285,8 +288,86 @@ void mqtt_publish_statistics(void) {
   mqttCli->publish(buf1, jsonString);
 }
 
-void mqtt_publish_programs(void) {
+bool programNameInList(const char *name) {
+  JsonDocument doc;
+  String jsonString;
 
+  preferences.begin(PREFS_NAMESPACE, true);
+  jsonString = preferences.getString(PREFS_PROGRAM_LIST, String("{}"));
+  preferences.end();
+  qtklog.print("read program list in JSON from preferences to look for: %s", name);
+
+  DeserializationError error = deserializeJson(doc, jsonString);
+
+  if (error) {
+    qtklog.warn("unable to deserialize JSON: %s", error.c_str());
+    return false;
+  }
+
+  JsonArray arr = doc.as<JsonArray>();
+
+  for (JsonVariant value : arr) {
+    const char *this_name = value.as<const char *>();
+    if (strcmp(name, this_name) == 0)
+      return true;
+  }
+  return false;
+}
+
+void addProgramNameToList(const char *name) {
+  JsonDocument doc;
+  String jsonIn, jsonOut;
+
+  // get the json from the prefs
+  preferences.begin(PREFS_NAMESPACE, true);
+  jsonIn = preferences.getString(PREFS_PROGRAM_LIST, String("[]"));
+  preferences.end();
+  qtklog.print("read program list in JSON from preferences: %s", jsonIn.c_str());
+
+  // convert to the doc
+  DeserializationError error = deserializeJson(doc, jsonIn);
+
+  if (error) {
+    qtklog.warn("unable to deserialize JSON: %s", error.c_str());
+    return;
+  }
+
+  // add the name
+  doc.add(name);
+  // serialize it back out
+  serializeJson(doc, jsonOut);
+
+  // save to preferences
+  preferences.begin(PREFS_NAMESPACE, false);
+  preferences.putString(PREFS_PROGRAM_LIST, jsonOut);
+  preferences.end();
+  qtklog.print("wrote program list in JSON to preferences: %s", jsonOut.c_str());
+}
+
+void mqtt_publish_programs(void) {
+  JsonDocument doc;
+  String jsonString;
+
+  preferences.begin(PREFS_NAMESPACE, true);
+  jsonString = preferences.getString(PREFS_PROGRAM_LIST, String("{}"));
+  preferences.end();
+  qtklog.print("read program list in JSON: %s", jsonString.c_str());
+
+  DeserializationError error = deserializeJson(doc, jsonString);
+
+  if (error) {
+    qtklog.warn("unable to deserialize JSON: %s", error.c_str());
+    return;
+  }
+
+  JsonArray arr = doc.as<JsonArray>();
+
+  for (JsonVariant value : arr) {
+    const char *name = value.as<const char *>();
+    snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_PROGRAM);
+    jsonString = program.getJSON(name);
+    mqttCli->publish(buf1, jsonString);
+  }
 }
 
 void ssr_on(void) {
@@ -509,6 +590,10 @@ void onGetStateMessageReceived(const String &message) {
     mqtt_publish_process_statistics();
     qtklog.print("process_statistics requested via mqtt");
   }
+  if (doc["programs"] | false) {
+    mqtt_publish_programs();
+    qtklog.print("programs requested via mqtt");
+  }
 }
 void onProgramMessageReceived(const String &message) {
   JsonDocument doc;
@@ -521,8 +606,11 @@ void onProgramMessageReceived(const String &message) {
   }
   // if it has a name object then we are setting the program
   if (doc["name"].is<const char*>()) {
-  	String name = doc["name"];
-	program.set(name, message);
+    const char *name = doc["name"];
+    program.set(name, message);
+    if (!programNameInList(name)) {
+       addProgramNameToList(name);
+    } 
   }
 }
 // when the connection to the mqtt has completed

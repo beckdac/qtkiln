@@ -145,14 +145,14 @@ void QTKilnProgram::set(const String &name, const String &program){
   }
 }
 
-String QTKilnProgram::getJSON(const String &name) {
+String QTKilnProgram::getJSON(const char *name) {
   String program;
 
   preferences.begin(QTPROGRAM_NAMESPACE, true);
-  if (preferences.isKey(name.c_str()))
-    program = preferences.getString(name.c_str());
+  if (preferences.isKey(name))
+    program = preferences.getString(name);
   else {
-    qtklog.warn("unable to find program in storage named %s", name.c_str());
+    qtklog.warn("unable to find program in storage named %s", name);
   }
   preferences.end();
 
@@ -163,7 +163,7 @@ struct QTKilnProgramStruct *QTKilnProgram::get(const String &name) {
   struct QTKilnProgramStruct *validProgram = NULL;
   String program;
 
-  program = getJSON(name);
+  program = getJSON(name.c_str());
   if (program.length() > 2) // at least an open and close brace
     validProgram = _parseProgram(program);
   return validProgram;

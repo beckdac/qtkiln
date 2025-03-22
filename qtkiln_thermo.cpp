@@ -19,9 +19,9 @@ QTKilnThermo::QTKilnThermo(uint16_t updateInterval_ms, MAX31855 *max31855, MAX66
   _lastTempC = -1;
   _taskHandle = NULL;
   if (_max31855 || _max6675) {
-    _err = false;
+    _err = 0;
   } else {
-    _err = true;
+    _err++;
     _errno = QTKILN_ERRNO_INVALID_TYPE;
   }
 }
@@ -51,7 +51,7 @@ void QTKilnThermo::begin(void) {
     }
     qtklog.print("MAX6675 connection verified");
   } else {
-    _err = true;
+    _err++;
     _errno = QTKILN_ERRNO_INVALID_TYPE;
   }
 
@@ -130,12 +130,12 @@ void QTKilnThermo::_doRead(void) {
 	_lastTempC = tmp;
     	_lastTime = millis();
       } else {
-	_err = true;
+	_err++;
 	_errno = QTKILN_ERRNO_READ_ERROR;
         qtklog.warn("MAX31855 thermocouple read error");
       }
     } else {
-      _err = true;
+      _err++;
       _errno = QTKILN_ERRNO_MAX31855_NOT_DETECTED;
       qtklog.warn("MAX31855 thermocouple not detected");
     }
@@ -146,12 +146,12 @@ void QTKilnThermo::_doRead(void) {
       _lastTempC = tmp;
       _lastTime = millis();
     } else {
-      _err = true;
+      _err++;
       _errno = QTKILN_ERRNO_READ_ERROR;
       qtklog.warn("MAX6675 thermocouple not responding");
     }
   } else {
-    _err = true;
+    _err++;
     _errno = QTKILN_ERRNO_INVALID_TYPE;
   }
 }
@@ -173,4 +173,8 @@ UBaseType_t QTKilnThermo::getTaskHighWaterMark(void) {
     return uxTaskGetStackHighWaterMark(_taskHandle);
   qtklog.warn("no task associated with qtkiln thermo in high watermark test");
   return 0;
+}
+
+unsigned int QTKilnThermo::getErrorCount(void) {
+  return _err;
 }
