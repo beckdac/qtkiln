@@ -217,3 +217,7 @@ void QTKilnProgram::setUpdateInterval_ms(uint16_t updateInterval_ms) {
 uint16_t QTKilnProgram::getUpdateInterval_ms(void) {
   return _updateInterval_ms;
 }
+
+bool QTKilnProgram::isRunning(void) {
+  return _isRunning;
+}

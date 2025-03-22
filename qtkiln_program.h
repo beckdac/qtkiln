@@ -42,6 +42,7 @@ class QTKilnProgram
     void load(const String &name);
     void stop();
     void pause();
+    bool isRunning();
     bool isPaused();
     void unPause();
     void thread(void);

@@ -1,6 +1,7 @@
 #include "qtkiln_pwm.h"
 #include "qtkiln_thermo.h"
 #include "qtkiln_log.h"
+#include "qtkiln_program.h"
 #include "qtkiln.h"
 
 #include <PID_v2.h>
@@ -9,6 +10,7 @@ extern Config config;
 extern QTKilnLog qtklog;
 extern QTKilnThermo *kiln_thermo;
 extern QTKilnThermo *housing_thermo;
+extern QTKilnProgram program;
 
 // use a static function to be the entry point for the task
 void pwmPWMFunction(void *pvParameter) {
@@ -97,14 +99,25 @@ float QTKilnPWM::getDutyCycle(void) {
 
 void QTKilnPWM::thread(void) {
   TickType_t xDelay;
+  double tmp;
+  unsigned long now;
 
   while (1) {
     if (_enabled && _pid) {
-      unsigned long now = millis();
+      now = millis();
       while (now - _windowStartTime > _windowSize_ms) {
         _windowStartTime += _windowSize_ms;
       }
-      _output_ms = _pid->Run(kiln_thermo->getTemperature_C());
+      tmp = _pid->Run(kiln_thermo->getTemperature_C());
+      if (isnan(tmp)) {
+         qtklog.warn("nan detected for output of PID, disabling pid");
+         disable();
+	 qtklog.warn("trying to shutdown any running program from pwm loop");
+	 if (program.isRunning()) {
+	   program.stop();
+	 }
+      }
+      _output_ms = tmp;
       if (now - _windowStartTime < _output_ms)
         ssr_on();
       else
