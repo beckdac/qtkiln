@@ -159,24 +159,24 @@ String QTKilnProgram::getJSON(const char *name) {
   return program;
 }
 
-struct QTKilnProgramStruct *QTKilnProgram::get(const String &name) {
+struct QTKilnProgramStruct *QTKilnProgram::get(const char *name) {
   struct QTKilnProgramStruct *validProgram = NULL;
   String program;
 
-  program = getJSON(name.c_str());
+  program = getJSON(name);
   if (program.length() > 2) // at least an open and close brace
     validProgram = _parseProgram(program);
   return validProgram;
 }
 
-void QTKilnProgram::load(const String &name) {
+void QTKilnProgram::loadProgram(const char *name) {
   struct QTKilnProgramStruct *program = NULL;
 
-  qtklog.print("loading program %s from memory", name.c_str());
+  qtklog.print("loading program %s from memory", name);
 
   program = get(name);
   if (!program) {
-    qtklog.print("failed to load program %s", name.c_str());
+    qtklog.print("failed to load program %s", name);
     return;
   }
   if (_currentProgram) {

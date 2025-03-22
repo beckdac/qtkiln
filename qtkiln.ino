@@ -586,8 +586,7 @@ void onSetStateMessageReceived(const String &message) {
   // if this request turns on the pid enable, then
   // do it first before parsing others, like target temp
   // if it turns it off, make sure the ssr is off
-  JsonVariant tmpObj = doc[MSG_PID_ENABLED];
-  if (!tmpObj.isNull()) {
+  if (doc[MSG_PID_ENABLED].is<bool>()) {
     bool pidEnabled = doc[MSG_PID_ENABLED];
     if (!pidEnabled && pidEnabledAtStart) {
       pwm.disable();
@@ -626,6 +625,9 @@ void onSetStateMessageReceived(const String &message) {
       if (Kd < 0)
         Kd = 0;
       updateTunings = true;
+    } else if (strcmp(kv.key().c_str(), "program") == 0) {
+      const char *name = doc["program"];
+      program.loadProgram(name);
     }
   }
   if (startPid) {

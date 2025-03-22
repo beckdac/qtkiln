@@ -36,10 +36,10 @@ class QTKilnProgram
     void begin();
     void loop();
     void set(const String &name, const String &program);
-    struct QTKilnProgramStruct *get(const String &name);
+    struct QTKilnProgramStruct *get(const char *name);
     String getJSON(const char *name);
     void start();
-    void load(const String &name);
+    void loadProgram(const char *name);
     void stop();
     void pause();
     bool isRunning();
