@@ -240,13 +240,9 @@ void setup() {
   // turn them on
   kiln_thermo->enable();
   housing_thermo->enable();
-  // get the readings
-  qtklog.print("kiln = %g C and housing = %g C",
-        kiln_thermo->getFilteredTemperature_C(),
-  	housing_thermo->getFilteredTemperature_C());
 
   // lcd setup
-  lcd_update(kiln_thermo->getFilteredTemperature_C(), false, false);
+  //lcd_update(kiln_thermo->getFilteredTemperature_C(), false, false);
 
   // turn this on at the end
   mqtt.enable();
@@ -421,6 +417,10 @@ void ssr_off(void) {
 // main loop, this is a freertos task
 void loop() {
   TickType_t xDelay;
+
+#define QTKILN_MAIN_LOOP_STARTUP_DELAY 1000
+  xDelay = pdMS_TO_TICKS(QTKILN_MAIN_LOOP_STARTUP_DELAY);
+  vTaskDelay(xDelay);
 
   while (1) {
     lcd_update(kiln_thermo->getFilteredTemperature_C(), ssr_state, ssr_state);
