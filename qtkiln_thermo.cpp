@@ -16,8 +16,9 @@ QTKilnThermo::QTKilnThermo(uint16_t updateInterval_ms, MAX31855 *max31855, MAX66
   _max31855 = max31855;
   _max6675 = max6675;
   _lastTime = 0;
-  _lastTempC = -1;
+  _lastTemp_C = 0;
   _taskHandle = NULL;
+  _lowPassFilter.cutoffFrequency_Hz = 1.;
   if (_max31855 || _max6675) {
     _err = 0;
   } else {
@@ -36,6 +37,9 @@ uint16_t QTKilnThermo::getUpdateInterval_ms(void) {
 }
 
 void QTKilnThermo::begin(void) {
+  _lowPassFilter.ts = 0;
+
+
   if (_max31855) {
     _max31855->begin();
     while(_max31855->getChipID(MAX31855_FORCE_READ_DATA) != MAX31855_ID) {
@@ -69,7 +73,12 @@ TaskHandle_t QTKilnThermo::getTask(void) {
 
 void QTKilnThermo::enable(void) {
   _enabled = true;
-  _doRead();
+  qtklog.debug(QTKLOG_DBG_PRIO_HIGH, "enabling thermo");
+  delay(100);
+  if (_lastTime == 0)
+    _doRead();
+  qtklog.debug(QTKLOG_DBG_PRIO_HIGH, "read thermo done");
+  delay(100);
 }
 
 void QTKilnThermo::disable(void) {
@@ -89,11 +98,18 @@ unsigned long QTKilnThermo::getLastTime(void) {
   return _lastTime;
 }
 
+float QTKilnThermo::getFilteredTemperature_C(void) {
+  if (_lastTime == 0) {
+    _doRead();
+  }
+  return _lowPassFilter.filtered_C;
+}
+
 float QTKilnThermo::getTemperature_C(void) {
   if (!_lastTime) {
     _doRead();
   }
-  return _lastTempC;
+  return _lastTemp_C;
 }
 
 void QTKilnThermo::_MAX31855_verbose_diagnose(uint8_t code) {
@@ -121,39 +137,63 @@ void QTKilnThermo::_MAX31855_verbose_diagnose(uint8_t code) {
     }
 }
 
+// simple first order low pass filter in Hz
+void QTKilnThermo::_filter(float sample) {
+  double ts = (millis() - _lowPassFilter.ts) * 1000;
+
+  qtklog.debug(QTKLOG_DBG_PRIO_HIGH, "sample = %g, previous sample = %g", sample, _lowPassFilter.prevSample_C);
+	
+  float a_0 = -(((ts / 2) * 2 * PI * _lowPassFilter.cutoffFrequency_Hz - 1) 
+		  / ((ts / 2) * 2 * PI * _lowPassFilter.cutoffFrequency_Hz + 1));
+  float b_0 = ((ts / 2) * 2 * PI * _lowPassFilter.cutoffFrequency_Hz) 
+	  	/ (1 + (ts / 2) * 2 * PI * _lowPassFilter.cutoffFrequency_Hz);
+
+  _lowPassFilter.filtered_C = a_0 * _lowPassFilter.filtered_C + 
+	  b_0 * _lowPassFilter.prevSample_C + b_0 * _lowPassFilter.prevSample_C;
+  _lowPassFilter.prevSample_C = sample;
+  _lowPassFilter.ts = millis();
+}
+
 void QTKilnThermo::_doRead(void) {
+  qtklog.debug(QTKLOG_DBG_PRIO_HIGH, "_doRead()");
   if (_max31855) {
     if (_max31855->detectThermocouple(MAX31855_FORCE_READ_DATA) == MAX31855_THERMOCOUPLE_OK) {
       double tmp =_max31855->getTemperature(MAX31855_FORCE_READ_DATA);
       if (tmp != MAX31855_ERROR) {
-	qtklog.debug(QTKLOG_DBG_PRIO_LOW, "max31855 = %g", tmp);
-	_lastTempC = tmp;
+	qtklog.debug(QTKLOG_DBG_PRIO_HIGH, "max31855 = %g", tmp);
+	_lastTemp_C = tmp;
     	_lastTime = millis();
       } else {
 	_err++;
 	_errno = QTKILN_ERRNO_READ_ERROR;
         qtklog.warn("MAX31855 thermocouple read error");
+        return;
       }
     } else {
       _err++;
       _errno = QTKILN_ERRNO_MAX31855_NOT_DETECTED;
       qtklog.warn("MAX31855 thermocouple not detected");
+      return;
     }
   } else if (_max6675) {
     double tmp = _max6675->getTemperature(MAX6675_FORCE_READ_DATA);
     if (tmp != MAX6675_ERROR) {
-      qtklog.debug(QTKLOG_DBG_PRIO_LOW, "max6675 = %g", tmp);
-      _lastTempC = tmp;
+      qtklog.debug(QTKLOG_DBG_PRIO_HIGH, "max6675 = %g", tmp);
+      _lastTemp_C = tmp;
       _lastTime = millis();
     } else {
       _err++;
       _errno = QTKILN_ERRNO_READ_ERROR;
       qtklog.warn("MAX6675 thermocouple not responding");
+      return;
     }
   } else {
     _err++;
     _errno = QTKILN_ERRNO_INVALID_TYPE;
+    qtklog.warn("no thermocouple object available");
+    return;
   }
+  _filter(_lastTemp_C);
 }
 
 void QTKilnThermo::thread(void) {
@@ -177,4 +217,13 @@ UBaseType_t QTKilnThermo::getTaskHighWaterMark(void) {
 
 unsigned int QTKilnThermo::getErrorCount(void) {
   return _err;
+}
+
+float QTKilnThermo::getFilterCutoffFrequency_Hz(void) {
+  return _lowPassFilter.cutoffFrequency_Hz;
+}
+
+void QTKilnThermo::setFilterCutoffFrequency_Hz(float cutoffFrequency_Hz) {
+  _lowPassFilter.cutoffFrequency_Hz = cutoffFrequency_Hz;
+  _lowPassFilter.ts = 0; // should this be reset? surely a non zero valu is a better estimate?
 }

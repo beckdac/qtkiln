@@ -2,7 +2,6 @@
 #define _QTKILN_H_
 
 // prototypes
-void config_set_thermo_update_int_ms(uint16_t thermo_update_int_ms);
 void config_set_pwm_update_int_ms(uint16_t pwm_update_int_ms);
 void config_set_mqtt_update_int_ms(uint16_t mqtt_update_int_ms);
 void config_set_program_update_int_ms(uint16_t program_update_int_ms);
@@ -34,13 +33,16 @@ struct Config {
   char hostname[MAX_CFG_STR] = HOSTNAME_DEFAULT;
   char mac[MAX_CFG_STR] = MAC_DEFAULT;
   char topic[MAX_CFG_STR] = "";
-  uint16_t thermoUpdateInterval_ms = 250;
   uint16_t pwmWindow_ms = 5000;
   uint16_t mqttUpdateInterval_ms = 1000;
   uint16_t programUpdateInterval_ms = 1000;
   bool mqtt_enable_debug_messages = false;
   uint8_t mainLoop_ms = 5;
   double Kp = PID_KP, Ki = PID_KI, Kd = PID_KD;
+  struct ConfigThermo {
+    uint16_t updateInterval_ms = 250;
+    float filterCutoffFrequency_Hz = 1.;
+  } kiln, housing;
 };
 
 // global temperature maxes
@@ -73,6 +75,9 @@ struct Config {
 #define PREFS_PID_KI "Ki"
 #define PREFS_PID_KD "Kd"
 #define PREFS_HOSTNAME "hostname"
+#define PREFS_KILN "kiln"
+#define PREFS_HOUSING "housing"
+#define PREFS_FLTR_CUT_FREQ_HZ "filterCutoffFrequency_Hz"
 #define PREFS_THRM_UPD_INT_MS "thermocoupleUpdateInterval_ms"
 #define PREFS_PWM_WINDOW_MS "PWMWindow_ms"
 #define PREFS_MQTT_UPD_INT_MS "mqttUpdateInterval_ms"

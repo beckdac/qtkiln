@@ -18,6 +18,9 @@
 
 char buf1[MAX_BUF];
 
+void config_setThermoUpdateInterval_ms(QTKilnThermo *thermo, uint16_t thermo_update_int_ms);
+void config_setThermoFilterCutoffFrequency_Hz(QTKilnThermo *thermo, float cutoffFrequency_Hz);
+
 // setup the basic log for serial logging
 QTKilnLog qtklog(true);
 
@@ -66,7 +69,7 @@ QTKilnProgram program;
 Preferences preferences;
 struct Config config;
 
-void configLoad(const String &jsonString) {
+void configLoad(const String &jsonString, bool justThermos=false) {
   JsonDocument doc;
 
   DeserializationError error = deserializeJson(doc, jsonString);
@@ -75,15 +78,28 @@ void configLoad(const String &jsonString) {
     qtklog.warn("deserializeJson() failed: %s", error.c_str());
     return;
   }
-  config_set_hostname(doc[PREFS_HOSTNAME] | config.hostname);
-  config_set_thermoUpdateInterval_ms(doc[PREFS_THRM_UPD_INT_MS] | config.thermoUpdateInterval_ms);
-  config_set_pwmWindow_ms(doc[PREFS_PWM_WINDOW_MS] | config.pwmWindow_ms);
-  config_set_mqttUpdateInterval_ms(doc[PREFS_MQTT_UPD_INT_MS] | config.mqttUpdateInterval_ms);
-  config_set_mqtt_enable_debug_messages(doc[PREFS_MQTT_ENABLE_DBG] | config.mqtt_enable_debug_messages);
-  config_set_programUpdateInterval_ms(doc[PREFS_PGM_UPD_INT_MS] | config.programUpdateInterval_ms);
-  config_set_pid_init_Kp(doc[PREFS_PID_KP] | config.Kp);
-  config_set_pid_init_Ki(doc[PREFS_PID_KI] | config.Ki);
-  config_set_pid_init_Kd(doc[PREFS_PID_KD] | config.Kd);
+  if (!justThermos) {
+    config_set_hostname(doc[PREFS_HOSTNAME] | config.hostname);
+    config_set_pwmWindow_ms(doc[PREFS_PWM_WINDOW_MS] | config.pwmWindow_ms);
+    config_set_mqttUpdateInterval_ms(doc[PREFS_MQTT_UPD_INT_MS] | config.mqttUpdateInterval_ms);
+    config_set_mqtt_enable_debug_messages(doc[PREFS_MQTT_ENABLE_DBG] | config.mqtt_enable_debug_messages);
+    config_set_programUpdateInterval_ms(doc[PREFS_PGM_UPD_INT_MS] | config.programUpdateInterval_ms);
+    config_set_pid_init_Kp(doc[PREFS_PID_KP] | config.Kp);
+    config_set_pid_init_Ki(doc[PREFS_PID_KI] | config.Ki);
+    config_set_pid_init_Kd(doc[PREFS_PID_KD] | config.Kd);
+  }
+  // we can only set these after they are configured 
+  // so check if they are allocated before setting these
+  if (doc[PREFS_KILN].is<JsonObject>() && kiln_thermo) {
+    config_setThermoUpdateInterval_ms(kiln_thermo, doc[PREFS_KILN][PREFS_THRM_UPD_INT_MS] | config.kiln.updateInterval_ms);
+    config_setThermoFilterCutoffFrequency_Hz(kiln_thermo, doc[PREFS_KILN][PREFS_FLTR_CUT_FREQ_HZ] | config.kiln.filterCutoffFrequency_Hz);
+  }
+  if (doc[PREFS_HOUSING].is<JsonObject>() && housing_thermo) {
+    config_setThermoUpdateInterval_ms(housing_thermo, doc[PREFS_HOUSING][PREFS_THRM_UPD_INT_MS] | config.housing.updateInterval_ms);
+    config_setThermoFilterCutoffFrequency_Hz(housing_thermo, doc[PREFS_HOUSING][PREFS_FLTR_CUT_FREQ_HZ] | config.housing.filterCutoffFrequency_Hz);
+  }
+  if (justThermos)
+    return;
   if (doc[CONFIG_RESET] | false) {
     configReset();
     esp_restart();
@@ -97,7 +113,6 @@ String configSerialize(void) {
   String jsonString;
 
   doc[PREFS_HOSTNAME] = config.hostname;
-  doc[PREFS_THRM_UPD_INT_MS] = config.thermoUpdateInterval_ms;
   doc[PREFS_PWM_WINDOW_MS] = config.pwmWindow_ms;
   doc[PREFS_PGM_UPD_INT_MS] = config.programUpdateInterval_ms;
   doc[PREFS_MQTT_UPD_INT_MS] = config.mqttUpdateInterval_ms;
@@ -105,6 +120,10 @@ String configSerialize(void) {
   doc[PREFS_PID_KP] = config.Kp;
   doc[PREFS_PID_KI] = config.Ki;
   doc[PREFS_PID_KD] = config.Kd;
+  doc[PREFS_KILN][PREFS_FLTR_CUT_FREQ_HZ] = config.kiln.filterCutoffFrequency_Hz;
+  doc[PREFS_KILN][PREFS_THRM_UPD_INT_MS] = config.kiln.updateInterval_ms;
+  doc[PREFS_HOUSING][PREFS_FLTR_CUT_FREQ_HZ] = config.housing.filterCutoffFrequency_Hz;
+  doc[PREFS_HOUSING][PREFS_THRM_UPD_INT_MS] = config.kiln.updateInterval_ms;
 
   serializeJson(doc, jsonString);
 
@@ -117,12 +136,12 @@ void configReset(void) {
   preferences.end();
 }
 
-void configLoadPrefs(void) {
+void configLoadPrefs(bool justThermos) {
   preferences.begin(PREFS_NAMESPACE, true);
   String jsonString = preferences.getString(PREFS_CONFIG_JSON, String("{}"));
   preferences.end();
   qtklog.print("read config in JSON to preferences: %s", jsonString.c_str());
-  configLoad(jsonString);
+  configLoad(jsonString, justThermos);
 }
 
 void configUpdatePrefs(void) {
@@ -157,7 +176,7 @@ void setup() {
   qtklog.print("QTK log has started at ms %lu...", millis());
 
   // load the preferences
-  configLoadPrefs();
+  configLoadPrefs(false);
 
   // connect to wifi
   WiFi.setHostname(config.hostname);
@@ -211,21 +230,24 @@ void setup() {
 
   // initialize the thermocouples and get the first readingings
   // kiln
-  kiln_thermo = new QTKilnThermo(config.thermoUpdateInterval_ms, &kiln_thermocouple, NULL);
+  kiln_thermo = new QTKilnThermo(config.kiln.updateInterval_ms, &kiln_thermocouple, NULL);
   kiln_thermo->begin();
-  kiln_thermo->enable();
   // housing
-  housing_thermo = new QTKilnThermo(config.thermoUpdateInterval_ms, NULL, &housing_thermocouple);
+  housing_thermo = new QTKilnThermo(config.housing.updateInterval_ms, NULL, &housing_thermocouple);
   housing_thermo->begin();
+  // this is done again here to force these thermocouple setup
+  configLoadPrefs(true);
+  // turn them on
+  kiln_thermo->enable();
   housing_thermo->enable();
   // get the readings
   qtklog.print("kiln = %g C and housing = %g C",
-        kiln_thermo->getTemperature_C(),
-  	housing_thermo->getTemperature_C());
+        kiln_thermo->getFilteredTemperature_C(),
+  	housing_thermo->getFilteredTemperature_C());
 
   // lcd setup
   // 0.5 is for rounding up
-  lcd_update(kiln_thermo->getTemperature_C() + 0.5, false, false);
+  lcd_update(kiln_thermo->getFilteredTemperature_C() + 0.5, false, false);
 
   // turn this on at the end
   mqtt.enable();
@@ -280,8 +302,10 @@ void mqtt_publish_statistics(void) {
   String jsonString;
 
   doc["time"] = millis();
-  doc["log"]["reallocationCount"] = qtklog.getReallocationCount();
-  doc["log"]["debugPriorityCutoff"] = qtklog.getDebugPriorityCutoff();
+  doc["state"]["debugPriorityCutoff"] = qtklog.getDebugPriorityCutoff();
+  doc["statistics"]["reallocationCount"] = qtklog.getReallocationCount();
+  doc["statistics"]["kilnErrorCount"] = kiln_thermo->getErrorCount();
+  doc["statistics"]["housingErrorCount"] = housing_thermo->getErrorCount();
 
   serializeJson(doc, jsonString);
   snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_STATE);
@@ -390,7 +414,7 @@ void loop() {
 
   while (1) {
     // 0.5 is for rounding up
-    lcd_update(kiln_thermo->getTemperature_C() + 0.5, ssr_state, ssr_state);
+    lcd_update(kiln_thermo->getFilteredTemperature_C() + 0.5, ssr_state, ssr_state);
     // run handlers for subprocesses 
     mqttCli->loop();
 
@@ -408,7 +432,7 @@ void config_set_hostname(const char *hostname) {
   strncpy(config.hostname, hostname, MAX_CFG_STR);
   qtklog.print("hostname set to %s", config.hostname);
 }
-void config_set_thermoUpdateInterval_ms(uint16_t thermoUpdateInterval_ms) {
+void config_setThermoUpdateInterval_ms(QTKilnThermo *thermo, uint16_t thermoUpdateInterval_ms) {
   if (thermoUpdateInterval_ms < THERMO_MIN_UPDATE_MS) {
     qtklog.warn("thermocouple update interval must be > %d ms ... forcing to min (%d)",
     	THERMO_MIN_UPDATE_MS, THERMO_MIN_UPDATE_MS);
@@ -419,12 +443,48 @@ void config_set_thermoUpdateInterval_ms(uint16_t thermoUpdateInterval_ms) {
 	THERMO_MAX_UPDATE_MS, THERMO_MAX_UPDATE_MS);
     thermoUpdateInterval_ms = THERMO_MAX_UPDATE_MS;
   }
-  config.thermoUpdateInterval_ms = thermoUpdateInterval_ms;
-  if (kiln_thermo)
-    kiln_thermo->setUpdateInterval_ms(config.thermoUpdateInterval_ms);
-  if (housing_thermo)
-    housing_thermo->setUpdateInterval_ms(config.thermoUpdateInterval_ms);
-  qtklog.print("thermocouple update interval = %d ms", config.thermoUpdateInterval_ms);
+  if (thermo == kiln_thermo) {
+    config.kiln.updateInterval_ms = thermoUpdateInterval_ms;
+    kiln_thermo->setUpdateInterval_ms(config.kiln.updateInterval_ms);
+  } else if (thermo == housing_thermo) {
+    config.housing.updateInterval_ms = thermoUpdateInterval_ms;
+    housing_thermo->setUpdateInterval_ms(config.housing.updateInterval_ms);
+  } else {
+    qtklog.warn("unknown thermocouple passed to config set thermocouple update interval");
+    return;
+  }
+  qtklog.print("%s thermocouple update interval set to %d ms", 
+        (thermo == kiln_thermo ? PREFS_KILN : PREFS_HOUSING),
+	thermo->getUpdateInterval_ms());
+}
+// the filter cutoff has to be faster than the sampling rate
+// and slower than the pwm rate
+#define THERMO_MIN_CUTOFF_HZ (1./(config.pwmWindow_ms / 1000.))
+#define THERMO_MAX_CUTOFF_HZ (1./(thermo->getUpdateInterval_ms() / 1000.))
+void config_setThermoFilterCutoffFrequency_Hz(QTKilnThermo *thermo, float cutoffFrequency_Hz) {
+  if (cutoffFrequency_Hz < THERMO_MIN_CUTOFF_HZ) {
+    qtklog.warn("thermocouple update interval must be > %d ms ... forcing to min (%d)",
+    	THERMO_MIN_CUTOFF_HZ, THERMO_MIN_CUTOFF_HZ);
+    cutoffFrequency_Hz = THERMO_MIN_CUTOFF_HZ;
+  }
+  if (cutoffFrequency_Hz > THERMO_MAX_CUTOFF_HZ) {
+    qtklog.warn("thermocouple update interval must be < %d ms ... forcing to max (%d)", 
+	THERMO_MAX_CUTOFF_HZ, THERMO_MAX_CUTOFF_HZ);
+    cutoffFrequency_Hz = THERMO_MAX_CUTOFF_HZ;
+  }
+  if (thermo == kiln_thermo) {
+    config.kiln.filterCutoffFrequency_Hz = cutoffFrequency_Hz;
+    kiln_thermo->setFilterCutoffFrequency_Hz(cutoffFrequency_Hz);
+  } else if (thermo == housing_thermo) {
+    config.housing.filterCutoffFrequency_Hz = cutoffFrequency_Hz;
+    housing_thermo->setFilterCutoffFrequency_Hz(cutoffFrequency_Hz);
+  } else {
+    qtklog.warn("unknown thermocouple passed to config set thermocouple update interval");
+    return;
+  }
+  qtklog.print("%s thermocouple low pass filter frequency cutoff set to %g Hz",
+        (thermo == kiln_thermo ? PREFS_KILN : PREFS_HOUSING),
+	thermo->getFilterCutoffFrequency_Hz());
 }
 void config_set_pwmWindow_ms(uint16_t pwmWindow_ms) {
   if (pwmWindow_ms < PWM_MIN_WINDOW_MS) {
@@ -498,7 +558,7 @@ void config_set_pid_init_Kd(double Kd) {
 // handle mqtt config messages
 void onConfigMessageReceived(const String &message) {
   qtklog.print("processing config update in json: %s", message.c_str());
-  configLoad(message);
+  configLoad(message, false);
 }
 
 // handle mqtt state messages

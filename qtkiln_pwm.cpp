@@ -57,7 +57,7 @@ void QTKilnPWM::enable(void) {
   if (!wasEnabled) {
     _pid->SetTunings(config.Kp, config.Ki, config.Kd);
     _pid->SetSampleTime(_windowSize_ms);
-    _pid->Start(kiln_thermo->getTemperature_C(), 0, _targetTemperature_C);
+    _pid->Start(kiln_thermo->getFilteredTemperature_C(), 0, _targetTemperature_C);
     _windowStartTime = millis();
     qtklog.debug(0, "PID is being enabled for the PWM task");
   }
@@ -108,7 +108,7 @@ void QTKilnPWM::thread(void) {
       while (now - _windowStartTime > _windowSize_ms) {
         _windowStartTime += _windowSize_ms;
       }
-      tmp = _pid->Run(kiln_thermo->getTemperature_C());
+      tmp = _pid->Run(kiln_thermo->getFilteredTemperature_C());
       if (isnan(tmp)) {
          qtklog.warn("nan detected for output of PID, disabling pid");
          disable();

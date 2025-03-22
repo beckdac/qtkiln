@@ -34,6 +34,9 @@ class QTKilnThermo
     uint16_t getUpdateInterval_ms(void);
     void setUpdateInterval_ms(uint16_t updateInterval_ms);
     unsigned int getErrorCount(void);
+    float getFilteredTemperature_C(void);
+    float getFilterCutoffFrequency_Hz(void);
+    void setFilterCutoffFrequency_Hz(float cutoffFrequency_Hz);
 
   private:
     void _MAX31855_verbose_diagnose(uint8_t code);
@@ -44,8 +47,15 @@ class QTKilnThermo
     bool _enabled = false;		// is the system running
     unsigned int _err = 0;		// count of errors
     uint8_t _errno = 0;			// what error has occurred last
-    float _lastTempC = .0;		// last temperature reading in C
+    float _lastTemp_C = .0;		// last temperature reading in C
     void _doRead(void);			// do the read via the phy
+    struct QTKilnThermoLowPassFilter {
+      float cutoffFrequency_Hz;
+      float prevSample_C;
+      float filtered_C;
+      double ts;
+    } _lowPassFilter;
+    void _filter(float sample);		// process a new sample into the filter
     TaskHandle_t _taskHandle = NULL;	// for managing the task later
 };
 

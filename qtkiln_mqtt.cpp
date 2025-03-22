@@ -86,9 +86,9 @@ void QTKilnMQTT::_publish_state(bool active, bool pid_current) {
   String jsonString;
 
   doc["kiln"]["time_ms"] = kiln_thermo->getLastTime();
-  doc["kiln"]["temp_C"] = kiln_thermo->getTemperature_C();
+  doc["kiln"]["temp_C"] = kiln_thermo->getFilteredTemperature_C();
   doc["housing"]["time_ms"] = housing_thermo->getLastTime();
-  doc["housing"]["temp_C"] = housing_thermo->getTemperature_C();
+  doc["housing"]["temp_C"] = housing_thermo->getFilteredTemperature_C();
   if (pwm.isEnabled() || active) {
     doc["pidEnabled"] = pwm.isEnabled();
     doc["targetTemp_C"] = pwm.getTargetTemperature_C();
