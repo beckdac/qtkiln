@@ -29,7 +29,7 @@ QTKilnThermo::QTKilnThermo(uint16_t updateInterval_ms, MAX31855 *max31855, MAX66
 
 void QTKilnThermo::setUpdateInterval_ms(uint16_t updateInterval_ms) {
   _updateInterval_ms = updateInterval_ms;
-  qtklog.debug(QTKLOG_DBG_PRIO_ALWAYS, "thermo update interval modified to %d ms", _updateInterval_ms);
+  qtklog.debug(QTKLOG_DBG_PRIO_HIGH, "thermo update interval modified to %d ms", _updateInterval_ms);
 }
 
 uint16_t QTKilnThermo::getUpdateInterval_ms(void) {
@@ -73,16 +73,16 @@ TaskHandle_t QTKilnThermo::getTask(void) {
 
 void QTKilnThermo::enable(void) {
   _enabled = true;
-  qtklog.debug(QTKLOG_DBG_PRIO_ALWAYS, "enabling thermo");
+  qtklog.debug(QTKLOG_DBG_PRIO_HIGH, "enabling thermo");
   if (_lastTime == 0) {
     _doRead();
-    qtklog.debug(QTKLOG_DBG_PRIO_ALWAYS, "read thermo done");
+    qtklog.debug(QTKLOG_DBG_PRIO_LOW, "read thermo done");
   }
 }
 
 void QTKilnThermo::disable(void) {
   _enabled = false;
-  qtklog.debug(QTKLOG_DBG_PRIO_ALWAYS, "disabling thermo");
+  qtklog.debug(QTKLOG_DBG_PRIO_HIGH, "disabling thermo");
 }
 
 bool QTKilnThermo::isEnabled(void) {
@@ -148,7 +148,7 @@ void QTKilnThermo::_filter(float sample) {
   float b_0 = ((ts / 2.) * 2. * PI * _lowPassFilter.cutoffFrequency_Hz) 
 	  	/ (1. + (ts / 2.) * 2. * PI * _lowPassFilter.cutoffFrequency_Hz);
 
-  //qtklog.debug(QTKLOG_DBG_PRIO_ALWAYS, "a_0 = %g b_0 = %g", a_0, b_0);
+  //qtklog.debug(QTKLOG_DBG_PRIO_LOW, "a_0 = %g b_0 = %g", a_0, b_0);
 
   _lowPassFilter.filtered_C = a_0 * _lowPassFilter.filtered_C + 
 	  b_0 * sample + b_0 * sample;
@@ -158,9 +158,9 @@ void QTKilnThermo::_filter(float sample) {
 }
 
 void QTKilnThermo::_doRead(void) {
-  //qtklog.debug(QTKLOG_DBG_PRIO_ALWAYS, "_doRead()");
+  //qtklog.debug(QTKLOG_DBG_PRIO_LOW, "_doRead()");
   if (_max31855) {
-    //qtklog.debug(QTKLOG_DBG_PRIO_ALWAYS, "_max31855 0x%x", _max31855);
+    //qtklog.debug(QTKLOG_DBG_PRIO_LOW, "_max31855 0x%x", _max31855);
     if (_max31855->detectThermocouple(MAX31855_FORCE_READ_DATA) == MAX31855_THERMOCOUPLE_OK) {
       double tmp =_max31855->getTemperature(MAX31855_FORCE_READ_DATA);
       if (tmp != MAX31855_ERROR) {
@@ -180,7 +180,7 @@ void QTKilnThermo::_doRead(void) {
       return;
     }
   } else if (_max6675) {
-    //qtklog.debug(QTKLOG_DBG_PRIO_ALWAYS, "max6675 0x%x", _max6675);
+    //qtklog.debug(QTKLOG_DBG_PRIO_LOW, "max6675 0x%x", _max6675);
     double tmp = _max6675->getTemperature(MAX6675_FORCE_READ_DATA);
     if (tmp != MAX6675_ERROR) {
       qtklog.debug(QTKLOG_DBG_PRIO_LOW, "max6675 = %g", tmp);
