@@ -1,6 +1,11 @@
 #include "Arduino.h"
 #include "qtkiln_log.h"
+#include "qtkiln.h"
 
+#include "EspMQTTClient.h"
+
+extern EspMQTTClient *mqttCli;
+extern Config config;
 
 QTKilnLog::QTKilnLog(bool enableSerial, bool enableMqtt, bool enableSyslog) {
   _lastMsgTime = 0;
@@ -71,7 +76,7 @@ char *QTKilnLog::_format(const char *fmt, va_list args) {
 
 void QTKilnLog::print(const char *fmt, ...) {
   va_list args;
-  char *buf;
+  char *buf, *tmp;
 
   if (!_serialOutputEnabled && !_mqttOutputEnabled && !_syslogOutputEnabled)
     return;
@@ -79,13 +84,21 @@ void QTKilnLog::print(const char *fmt, ...) {
   _lastMsgTime = millis();
 
   va_start(args, fmt);
-  buf = _format(fmt, args);
+  tmp = _format(fmt, args);
   va_end(args);
 
   if (_serialOutputEnabled)
-    Serial.println(buf);
+    Serial.println(tmp);
+  if (_mqttOutputEnabled) {
+    char topic[MAX_BUF];
+    snprintf(topic, MAX_BUF, "%s/%s", config.topic, "log");
+    buf = (char *)malloc(strlen(tmp) + 64);
+    snprintf(buf, strlen(tmp) + 64, "{\"log\":\"%s\",\"time\":%lu,\"msg\":\"%s\"}", "print", _lastMsgTime, tmp);
+    mqttCli->publish(topic, buf);
+    free(buf);
+  }
 
-  free(buf);
+  free(tmp);
 }
 
 void QTKilnLog::debug(uint16_t priority, const char *fmt, ...) {
@@ -110,8 +123,15 @@ void QTKilnLog::debug(uint16_t priority, const char *fmt, ...) {
     // allocate a larger buff to hold the DEBUG tag, time, colon
     // and spaces; 64 is a very large over estimate for this
     buf = (char *)malloc(strlen(tmp) + 64);
-    snprintf(buf, strlen(tmp) + 64, "%s %lu : %s", "DEBUG", now, tmp);
+    snprintf(buf, strlen(tmp) + 64, "%s %lu (pri=%d) : %s", "DEBUG", now, priority, tmp);
     Serial.println(buf);
+  }
+  if (_mqttOutputEnabled) {
+    char topic[MAX_BUF];
+    snprintf(topic, MAX_BUF, "%s/%s", config.topic, "log");
+    buf = (char *)malloc(strlen(tmp) + 64);
+    snprintf(buf, strlen(tmp) + 64, "{\"log\":\"%s\",\"time\":%lu,\"priority\":%u,\"msg\":\"%s\"}", "debug", now, priority, tmp);
+    mqttCli->publish(topic, buf);
   }
 
   free(tmp);
@@ -140,6 +160,13 @@ void QTKilnLog::warn(const char *fmt, ...) {
     snprintf(buf, strlen(tmp) + 64, "%s %lu : %s", "WARN", now, tmp);
     Serial.println(buf);
   }
+  if (_mqttOutputEnabled) {
+    char topic[MAX_BUF];
+    snprintf(topic, MAX_BUF, "%s/%s", config.topic, "log");
+    buf = (char *)malloc(strlen(tmp) + 64);
+    snprintf(buf, strlen(tmp) + 64, "{\"log\":\"%s\",\"time\":%lu,\"msg\":\"%s\"}", "warn", now, tmp);
+    mqttCli->publish(topic, buf);
+  }
 
   free(tmp);
   free(buf);
@@ -166,6 +193,13 @@ void QTKilnLog::error(const char *fmt, ...) {
     buf = (char *)malloc(strlen(tmp) + 64);
     snprintf(buf, strlen(tmp) + 64, "%s %lu : %s", "WARN", now, tmp);
     Serial.println(buf);
+  }
+  if (_mqttOutputEnabled) {
+    char topic[MAX_BUF];
+    snprintf(topic, MAX_BUF, "%s/%s", config.topic, "log");
+    buf = (char *)malloc(strlen(tmp) + 64);
+    snprintf(buf, strlen(tmp) + 64, "{\"log\":\"%s\",\"time\":%lu,\"msg\":\"%s\"}", "error", now, tmp);
+    mqttCli->publish(topic, buf);
   }
 
   free(tmp);

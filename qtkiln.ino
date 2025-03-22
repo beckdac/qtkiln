@@ -204,6 +204,7 @@ void setup() {
   qtklog.print("MQTT client connected");
   mqttCli->enableDebuggingMessages(config.mqtt_enable_debug_messages);
   mqtt.begin(config.mqttUpdateInterval_ms, mqttCli);
+  qtklog.mqttOutputEnable(true);
 
   // initialize the thermocouples and get the first readingings
   // kiln
