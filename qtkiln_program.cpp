@@ -61,7 +61,7 @@ UBaseType_t QTKilnProgram::getTaskHighWaterMark(void) {
 struct QTKilnProgramStruct *QTKilnProgram::_parseProgram(const String &program) {
   JsonDocument doc;
 
-  qtklog.debug(10, "parsing program from JSON: %s", program.c_str());
+  qtklog.debug(0, "parsing program from JSON: %s", program.c_str());
 
   DeserializationError error = deserializeJson(doc, program);
 
@@ -82,38 +82,50 @@ struct QTKilnProgramStruct *QTKilnProgram::_parseProgram(const String &program) 
   // parse the individual steps out of the document
   for (int i = 0; i < steps; ++i) {
     // find the target temperature for this step
-    if (!doc[i+1][PGM_TARGET_TEMP].is<uint16_t>()){
-      qtklog.warn("failed to parse program at step %d because the target temperature was missing", i+1);
+    if (!doc["step"][i][PGM_TARGET_TEMP].is<uint16_t>()){
+      qtklog.warn("failed to parse program at step %d because the target temperature was missing", i);
       free(new_program->step);
       free(new_program);
       return NULL;
     }
-    new_program->step[i].targetTemperature_C = doc[i + 1][PGM_TARGET_TEMP];
+    new_program->step[i].targetTemperature_C = doc["step"][i][PGM_TARGET_TEMP];
     // set up the transition time
-    if (!doc[i+1][PGM_TRANS_WINDOW_MIN].is<uint16_t>()){
-      new_program->step[i].asFastAsPossible = doc[i + 1][PGM_AFAP] | false;
+    if (!doc["step"][i][PGM_TRANS_WINDOW_MIN].is<uint16_t>()){
+      new_program->step[i].asFastAsPossible = doc["step"][i][PGM_AFAP] | false;
       // no transition window time and not AFAP, something is wrong
       if (!new_program->step[i].asFastAsPossible) {
-	qtklog.warn("couldn't find transition time or As Fast As Possible flag parsing step %d", i+1);
+	qtklog.warn("couldn't find transition time or As Fast As Possible flag parsing step %d", i);
 	free(new_program->step);
 	free(new_program);
 	return NULL;
       }
+      new_program->step[i].transitionWindow_ms = 0;
     } else {
-      new_program->step[i].transitionWindow_ms = (doc[i + 1][PGM_TRANS_WINDOW_MIN]);
+      new_program->step[i].transitionWindow_ms = doc["step"][i][PGM_TRANS_WINDOW_MIN] | 0;
       new_program->step[i].transitionWindow_ms *= 1000 * 60; // convert min to ms
-      new_program->step[i].asFastAsPossible = doc[i + 1][PGM_AFAP] | false;
+      new_program->step[i].asFastAsPossible = doc["step"][i][PGM_AFAP] | false;
       if (new_program->step[i].asFastAsPossible) {
-	qtklog.warn("transition time window and as fast as possible can't both be specificed for step %d", i+1);
+	qtklog.warn("transition time window and as fast as possible can't both be specificed for step %d", i);
 	free(new_program->step);
 	free(new_program);
 	return NULL;
       }
     }
-    new_program->step[i].dwell_ms = doc[PGM_DWELL_MIN] | 0;
+    new_program->step[i].dwell_ms = doc["step"][i][PGM_DWELL_MIN] | 0;
     new_program->step[i].dwell_ms *= 1000 * 60; // convert min to ms
   }
+  _debugPrint(new_program);
   return new_program;
+}
+
+void QTKilnProgram::_debugPrint(QTKilnProgramStruct *prg) {
+  if (!prg)
+    qtklog.debug(0, "program structure missing when calling debugPrint of program");
+  qtklog.debug(0, "program has %d steps", prg->steps);
+  qtklog.debug(0, "step  %10s  %10s  %10s  %10s", PGM_TARGET_TEMP, PGM_AFAP, PGM_TRANS_WINDOW_MIN, PGM_DWELL_MIN);
+  for (uint16_t i = 0; i < prg->steps; ++i) {
+    qtklog.debug(0, "%4d  %10d  %10d  %10d  %10d", i, prg->step[i].targetTemperature_C, prg->step[i].asFastAsPossible, prg->step[i].transitionWindow_ms / 1000 / 60, prg->step[i].dwell_ms / 1000 / 60);
+  }
 }
 
 void QTKilnProgram::_saveProgram(const String &name, const String &program) {

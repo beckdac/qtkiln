@@ -53,6 +53,7 @@ class QTKilnProgram
 
   private:
     struct QTKilnProgramStruct *_parseProgram(const String &program);
+    void _debugPrint(QTKilnProgramStruct *prg); // <-- this belongs on the struct!!
     void _saveProgram(const String &name, const String &program);
     bool _verifyProgram(const String &program);
     struct QTKilnProgramStruct *_currentProgram;
