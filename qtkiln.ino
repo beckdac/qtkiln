@@ -2,6 +2,7 @@
 #include <esp_wifi.h>
 #include <Arduino.h>
 #include <Preferences.h>
+#include <time.h>
 
 #include <MAX31855.h>
 #include <MAX6675.h>
@@ -87,6 +88,7 @@ void configLoad(const String &jsonString, bool justThermos=false) {
     config_set_pid_init_Kp(doc[PREFS_PID_KP] | config.Kp);
     config_set_pid_init_Ki(doc[PREFS_PID_KI] | config.Ki);
     config_set_pid_init_Kd(doc[PREFS_PID_KD] | config.Kd);
+    config_setTimezone(doc[PREFS_TIMEZONE] | config.timezone);
   }
   // we can only set these after they are configured 
   // so check if they are allocated before setting these
@@ -120,6 +122,7 @@ String configSerialize(void) {
   doc[PREFS_PID_KP] = config.Kp;
   doc[PREFS_PID_KI] = config.Ki;
   doc[PREFS_PID_KD] = config.Kd;
+  doc[PREFS_TIMEZONE] = config.timezone;
   doc[PREFS_KILN][PREFS_FLTR_CUT_FREQ_HZ] = config.kiln.filterCutoffFrequency_Hz;
   doc[PREFS_KILN][PREFS_THRM_UPD_INT_MS] = config.kiln.updateInterval_ms;
   doc[PREFS_HOUSING][PREFS_FLTR_CUT_FREQ_HZ] = config.housing.filterCutoffFrequency_Hz;
@@ -560,6 +563,24 @@ void config_set_pid_init_Kd(double Kd) {
     Kd = 0;
   config.Kd = Kd;
   qtklog.print("PID initial Kd set to %g", config.Kd);
+}
+void config_setTimezone(const char *timeZone) {
+  time_t now;
+  struct tm timeinfo;
+  char buf[MAX_BUF];
+
+  if (!timeZone) {
+    qtklog.warn("empty timeZone passed to set time zone");
+    return;
+  }
+
+  setenv("TZ", timeZone, 1);
+  tzset();
+
+  // localtime triggers calls to ntp and other things
+  localtime_r(&now, &timeinfo);
+  strftime(buf, MAX_BUF, "%c", &timeinfo);
+  qtklog.debug(QTKLOG_DBG_PRIO_ALWAYS, "time zone set to %s where the current time is %s", timeZone, buf);
 }
 
 

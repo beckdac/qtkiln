@@ -57,10 +57,16 @@ class QTKilnProgram
     void _saveProgram(const String &name, const String &program);
     bool _verifyProgram(const String &program);
     struct QTKilnProgramStruct *_currentProgram;
+    void _resetProgramVariables(void);  // when a new program is read
+    void _resetProgramStepVariables(void);  // for each new step in a program
     uint16_t _updateInterval_ms;	// the delay time in ms between task updates
     bool _running;			// is this program running
     bool _paused;			// is it paused at a certain state
     uint8_t _currentStep;		// current step
+    bool _currentAFAPUp = true;		// is our current as fast as possible about going up in T?
+    unsigned long _nextStepChangeTime_ms;// time in device ms that we change to the next step
+    unsigned long _stepStartTime_ms;	// when we started this step
+    bool _inDwell = false;		// are we in the dwell state of this step
     TaskHandle_t _taskHandle = NULL;    // for managing the task later
 };
 

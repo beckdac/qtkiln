@@ -8,6 +8,7 @@ void config_set_program_update_int_ms(uint16_t program_update_int_ms);
 void config_set_pid_init_Ki(double Ki);
 void config_set_pid_init_Kd(double Kd);
 void config_set_pid_init_Kp(double Kp);
+void config_setTimezone(const char *timeZone);
 void onConnectionEstablished(void);
 void onConfigMessageReceived(const String &message);
 void onStateSetMessageReceived(const String &message);
@@ -33,6 +34,7 @@ struct Config {
   char hostname[MAX_CFG_STR] = HOSTNAME_DEFAULT;
   char mac[MAX_CFG_STR] = MAC_DEFAULT;
   char topic[MAX_CFG_STR] = "";
+  char timezone[MAX_CFG_STR] = "GMT-8";
   uint16_t pwmWindow_ms = 5000;
   uint16_t mqttUpdateInterval_ms = 1000;
   uint16_t programUpdateInterval_ms = 1000;
@@ -77,6 +79,7 @@ struct Config {
 #define PREFS_HOSTNAME "hostname"
 #define PREFS_KILN "kiln"
 #define PREFS_HOUSING "housing"
+#define PREFS_TIMEZONE "tz"
 #define PREFS_FLTR_CUT_FREQ_HZ "filterCutoffFrequency_Hz"
 #define PREFS_THRM_UPD_INT_MS "thermocoupleUpdateInterval_ms"
 #define PREFS_PWM_WINDOW_MS "PWMWindow_ms"
