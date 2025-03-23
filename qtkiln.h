@@ -2,13 +2,14 @@
 #define _QTKILN_H_
 
 // prototypes
-void config_set_pwm_update_int_ms(uint16_t pwm_update_int_ms);
-void config_set_mqtt_update_int_ms(uint16_t mqtt_update_int_ms);
-void config_set_program_update_int_ms(uint16_t program_update_int_ms);
-void config_set_pid_init_Ki(double Ki);
-void config_set_pid_init_Kd(double Kd);
-void config_set_pid_init_Kp(double Kp);
+void config_setPwmWindow_ms(uint16_t pwm_update_int_ms);
+void config_setMqttUpdateInterval_ms(uint16_t mqtt_update_int_ms);
+void config_setProgramUpdateInterval_ms(uint16_t program_update_int_ms);
+void config_setPidInitialKi(double Ki);
+void config_setPidInitialKd(double Kd);
+void config_setPidInitialKp(double Kp);
 void config_setTimezone(const char *timeZone);
+void config_setHostname(const char *hostname);
 void onConnectionEstablished(void);
 void onConfigMessageReceived(const String &message);
 void onStateSetMessageReceived(const String &message);
@@ -38,7 +39,7 @@ struct Config {
   uint16_t pwmWindow_ms = 5000;
   uint16_t mqttUpdateInterval_ms = 1000;
   uint16_t programUpdateInterval_ms = 1000;
-  bool mqtt_enable_debug_messages = false;
+  bool mqttEnableDebugMessages = false;
   uint8_t mainLoop_ms = 5;
   double Kp = PID_KP, Ki = PID_KI, Kd = PID_KD;
   struct ConfigThermo {

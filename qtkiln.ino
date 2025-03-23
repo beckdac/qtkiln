@@ -25,6 +25,10 @@ void config_setThermoFilterCutoffFrequency_Hz(QTKilnThermo *thermo, float cutoff
 // setup the basic log for serial logging
 QTKilnLog qtklog(true);
 
+// alarm pin
+#define ALARM_PIN 8
+bool alarm_state = false;
+
 // thermocouple phy
 #define MAXDO_PIN 5
 #define MAXCS0_PIN 3 // MAX31855 kiln
@@ -80,14 +84,14 @@ void configLoad(const String &jsonString, bool justThermos=false) {
     return;
   }
   if (!justThermos) {
-    config_set_hostname(doc[PREFS_HOSTNAME] | config.hostname);
-    config_set_pwmWindow_ms(doc[PREFS_PWM_WINDOW_MS] | config.pwmWindow_ms);
-    config_set_mqttUpdateInterval_ms(doc[PREFS_MQTT_UPD_INT_MS] | config.mqttUpdateInterval_ms);
-    config_set_mqtt_enable_debug_messages(doc[PREFS_MQTT_ENABLE_DBG] | config.mqtt_enable_debug_messages);
-    config_set_programUpdateInterval_ms(doc[PREFS_PGM_UPD_INT_MS] | config.programUpdateInterval_ms);
-    config_set_pid_init_Kp(doc[PREFS_PID_KP] | config.Kp);
-    config_set_pid_init_Ki(doc[PREFS_PID_KI] | config.Ki);
-    config_set_pid_init_Kd(doc[PREFS_PID_KD] | config.Kd);
+    config_setHostname(doc[PREFS_HOSTNAME] | config.hostname);
+    config_setPwmWindow_ms(doc[PREFS_PWM_WINDOW_MS] | config.pwmWindow_ms);
+    config_setMqttUpdateInterval_ms(doc[PREFS_MQTT_UPD_INT_MS] | config.mqttUpdateInterval_ms);
+    config_setMqttEnableDebugMessages(doc[PREFS_MQTT_ENABLE_DBG] | config.mqttEnableDebugMessages);
+    config_setProgramUpdateInterval_ms(doc[PREFS_PGM_UPD_INT_MS] | config.programUpdateInterval_ms);
+    config_setPidInitialKp(doc[PREFS_PID_KP] | config.Kp);
+    config_setPidInitialKi(doc[PREFS_PID_KI] | config.Ki);
+    config_setPidInitialKd(doc[PREFS_PID_KD] | config.Kd);
     config_setTimezone(doc[PREFS_TIMEZONE] | config.timezone);
   }
   // we can only set these after they are configured 
@@ -118,7 +122,7 @@ String configSerialize(void) {
   doc[PREFS_PWM_WINDOW_MS] = config.pwmWindow_ms;
   doc[PREFS_PGM_UPD_INT_MS] = config.programUpdateInterval_ms;
   doc[PREFS_MQTT_UPD_INT_MS] = config.mqttUpdateInterval_ms;
-  doc[PREFS_MQTT_ENABLE_DBG] = config.mqtt_enable_debug_messages;
+  doc[PREFS_MQTT_ENABLE_DBG] = config.mqttEnableDebugMessages;
   doc[PREFS_PID_KP] = config.Kp;
   doc[PREFS_PID_KI] = config.Ki;
   doc[PREFS_PID_KD] = config.Kd;
@@ -163,11 +167,14 @@ void setup() {
   uint8_t u8mac[6];
 
   // no matter what this is the firs thing we do
-  // setup PWM
   pinMode(SSR_PIN, OUTPUT);
   // always turn it off incase we are coming back from a reset
   ssr_state=true;
   ssr_off();
+  // always turn it off incase we are coming back from a reset
+  pinMode(ALARM_PIN, OUTPUT);
+  alarm_state=false;
+  alarm_off();
 
   // initialize the serial for 115200 baud
   Serial.begin(115200);
@@ -207,7 +214,7 @@ void setup() {
     char buf[MAX_CFG_STR];
     snprintf(buf, MAX_CFG_STR, "qtkiln_%s", config.mac);
     qtklog.warn("default hostname of %s found, setting it to %s and resetting device", config.hostname, buf);
-    config_set_hostname(buf);
+    config_setHostname(buf);
     configUpdatePrefs();
     esp_restart();
   }
@@ -226,7 +233,7 @@ void setup() {
   mqttCli = new EspMQTTClient(WIFI_SSID, WIFI_PASS, MQTT_BROKER,
     MQTT_USER, MQTT_PASS, config.mac, MQTT_PORT);
   qtklog.print("MQTT client connected");
-  mqttCli->enableDebuggingMessages(config.mqtt_enable_debug_messages);
+  mqttCli->enableDebuggingMessages(config.mqttEnableDebugMessages);
   mqtt.begin(config.mqttUpdateInterval_ms, mqttCli);
   qtklog.mqttOutputEnable(true);
 
@@ -402,7 +409,22 @@ void mqtt_publish_programs(void) {
   }
 }
 
+void alarm_on(void) {
+  if (alarm_state)
+    return;
+  alarm_state = true;
+  digitalWrite(ALARM_PIN, LOW);
+}
+
+void alarm_off(void) {
+  if (alarm_state) {
+    alarm_state = false;
+    digitalWrite(ALARM_PIN, HIGH);
+  }
+}
+
 void ssr_on(void) {
+  alarm_on();
   if (ssr_state)
     return;
   ssr_state = true;
@@ -410,6 +432,7 @@ void ssr_on(void) {
 }
 
 void ssr_off(void) {
+  alarm_off();
   if (ssr_state) {
     ssr_state = false;
     digitalWrite(SSR_PIN, HIGH);
@@ -435,7 +458,7 @@ void loop() {
 }
 
 // set configuration variables after checking them
-void config_set_hostname(const char *hostname) {
+void config_setHostname(const char *hostname) {
   if (!hostname) {
     qtklog.warn("empty hostname passed to %s", __func__);
     return;
@@ -497,7 +520,7 @@ void config_setThermoFilterCutoffFrequency_Hz(QTKilnThermo *thermo, float cutoff
         (thermo == kiln_thermo ? PREFS_KILN : PREFS_HOUSING),
 	thermo->getFilterCutoffFrequency_Hz());
 }
-void config_set_pwmWindow_ms(uint16_t pwmWindow_ms) {
+void config_setPwmWindow_ms(uint16_t pwmWindow_ms) {
   if (pwmWindow_ms < PWM_MIN_WINDOW_MS) {
     qtklog.warn("PWM window must be > %d ms ... forcing to min (%d)",
 	PWM_MIN_WINDOW_MS, PWM_MIN_WINDOW_MS);
@@ -511,7 +534,7 @@ void config_set_pwmWindow_ms(uint16_t pwmWindow_ms) {
   config.pwmWindow_ms = pwmWindow_ms;
   qtklog.print("PWM update interval = %d ms", config.pwmWindow_ms);
 }
-void config_set_mqttUpdateInterval_ms(uint16_t mqttUpdateInterval_ms) {
+void config_setMqttUpdateInterval_ms(uint16_t mqttUpdateInterval_ms) {
   if (mqttUpdateInterval_ms < MQTT_MIN_UPDATE_MS) {
     qtklog.warn("mqtt update interval must be > %d ms .. forcing to min (%d)",
 	MQTT_MIN_UPDATE_MS, MQTT_MIN_UPDATE_MS);
@@ -526,12 +549,12 @@ void config_set_mqttUpdateInterval_ms(uint16_t mqttUpdateInterval_ms) {
   mqtt.setUpdateInterval_ms(config.mqttUpdateInterval_ms);
   qtklog.print("mqtt update interval  = %d ms", config.mqttUpdateInterval_ms);
 }
-void config_set_mqtt_enable_debug_messages(bool enable_messages) {
-  config.mqtt_enable_debug_messages = enable_messages;
+void config_setMqttEnableDebugMessages(bool enable_messages) {
+  config.mqttEnableDebugMessages = enable_messages;
   if (mqttCli)
-    mqttCli->enableDebuggingMessages(config.mqtt_enable_debug_messages);
+    mqttCli->enableDebuggingMessages(config.mqttEnableDebugMessages);
 }
-void config_set_programUpdateInterval_ms(uint16_t programUpdateInterval_ms) {
+void config_setProgramUpdateInterval_ms(uint16_t programUpdateInterval_ms) {
   if (programUpdateInterval_ms < PGM_MIN_UPDATE_MS) {
     qtklog.warn("program update interval must be > %d ms ... forcing to min (%d)",
 	PGM_MIN_UPDATE_MS, PGM_MIN_UPDATE_MS);
@@ -546,19 +569,19 @@ void config_set_programUpdateInterval_ms(uint16_t programUpdateInterval_ms) {
   program.setUpdateInterval_ms(config.programUpdateInterval_ms);
   qtklog.print("program update interval = %d ms", config.programUpdateInterval_ms);
 }
-void config_set_pid_init_Kp(double Kp) {
+void config_setPidInitialKp(double Kp) {
   if (Kp < 0)
     Kp = 0;
   config.Kp = Kp;
   qtklog.print("PID initial Kp set to %g", config.Kp);
 }
-void config_set_pid_init_Ki(double Ki) {
+void config_setPidInitialKi(double Ki) {
   if (Ki < 0)
     Ki = 0;
   config.Ki = Ki;
   qtklog.print("PID initial Ki set to %g", config.Ki);
 }
-void config_set_pid_init_Kd(double Kd) {
+void config_setPidInitialKd(double Kd) {
   if (Kd < 0)
     Kd = 0;
   config.Kd = Kd;
