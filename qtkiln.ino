@@ -45,7 +45,7 @@ EspMQTTClient *mqttCli = NULL;
 QTKilnMQTT mqtt;
 
 // PWM object
-#define SSR_PIN 8
+#define SSR_PIN 10
 bool ssr_state = false;
 QTKilnPWM pwm(QTKILN_PWM_DEFAULT_WINDOW_SIZE);
 
@@ -160,6 +160,10 @@ void setup() {
   uint8_t u8mac[6];
 
   // no matter what this is the firs thing we do
+  // setup PWM
+  pinMode(SSR_PIN, OUTPUT);
+  // always turn it off incase we are coming back from a reset
+  ssr_state=true;
   ssr_off();
 
   // initialize the serial for 115200 baud
@@ -208,11 +212,6 @@ void setup() {
   snprintf(config.topic, MAX_CFG_STR, MQTT_TOPIC_FMT,
 	MQTT_TOPIC_BASE, config.mac);
   qtklog.print("topic root for this device is %s", config.topic);
-
-  // setup PWM
-  pinMode(SSR_PIN, OUTPUT);
-  // always turn it off incase we are coming back from a reset
-  digitalWrite(SSR_PIN, LOW);
 
   // setup PID
   pwm.begin();
@@ -404,13 +403,13 @@ void ssr_on(void) {
   if (ssr_state)
     return;
   ssr_state = true;
-  digitalWrite(SSR_PIN, HIGH);
+  digitalWrite(SSR_PIN, LOW);
 }
 
 void ssr_off(void) {
   if (ssr_state) {
     ssr_state = false;
-    digitalWrite(SSR_PIN, LOW);
+    digitalWrite(SSR_PIN, HIGH);
   }
 }
 
