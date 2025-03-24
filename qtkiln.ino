@@ -410,30 +410,28 @@ void mqtt_publish_programs(void) {
 }
 
 void alarm_on(void) {
-  if (alarm_state)
-    return;
+  qtklog.debug(QTKLOG_DBG_PRIO_ALWAYS, "alarm on called");
   alarm_state = true;
   digitalWrite(ALARM_PIN, LOW);
 }
 
 void alarm_off(void) {
-  if (alarm_state) {
-    alarm_state = false;
-    digitalWrite(ALARM_PIN, HIGH);
-  }
+  qtklog.debug(QTKLOG_DBG_PRIO_ALWAYS, "alarm off called");
+  alarm_state = false;
+  digitalWrite(ALARM_PIN, HIGH);
 }
 
 void ssr_on(void) {
-  alarm_on();
   if (ssr_state)
     return;
+  alarm_on();
   ssr_state = true;
   digitalWrite(SSR_PIN, LOW);
 }
 
 void ssr_off(void) {
-  alarm_off();
   if (ssr_state) {
+    alarm_off();
     ssr_state = false;
     digitalWrite(SSR_PIN, HIGH);
   }
