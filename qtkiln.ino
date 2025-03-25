@@ -3,9 +3,10 @@
 #include <Arduino.h>
 #include <Preferences.h>
 #include <time.h>
+#include "esp_chip_info.h"
+#include "ESP.h"
 
 #include <MAX31855.h>
-#include <MAX6675.h>
 #include <EspMQTTClient.h>
 #include <TM1637Display.h>
 #include <ArduinoJson.h>
@@ -26,16 +27,17 @@ void config_setThermoFilterCutoffFrequency_Hz(QTKilnThermo *thermo, float cutoff
 QTKilnLog qtklog(true);
 
 // alarm pin
-#define ALARM_PIN 8
+#define ALARM_PIN 4
 bool alarm_state = false;
 
 // thermocouple phy
-#define MAXDO_PIN 5
-#define MAXCS0_PIN 3 // MAX31855 kiln
-#define MAXCS1_PIN 2 // MAX6675 housing
-#define MAXSCK_PIN 4
-MAX31855 kiln_thermocouple(MAXCS0_PIN);
-MAX6675 housing_thermocouple(MAXCS1_PIN);
+#define MAXDO_PIN 19
+#define MAXCS0_PIN 17 // MAX31855 kiln
+#define MAXCS1_PIN 16 // MAX31855 housing
+#define MAXSCK_PIN 18
+SPIClass *vSPI = new SPIClass(VSPI);
+MAX31855 kiln_MAX31855(MAXCS0_PIN, vSPI);
+MAX31855 housing_MAX31855(MAXCS1_PIN, vSPI);
 QTKilnThermo *kiln_thermo = NULL;
 QTKilnThermo *housing_thermo = NULL;
 
@@ -50,13 +52,13 @@ EspMQTTClient *mqttCli = NULL;
 QTKilnMQTT mqtt;
 
 // PWM object
-#define SSR_PIN 10
+#define SSR_PIN 17
 bool ssr_state = false;
 QTKilnPWM pwm(QTKILN_PWM_DEFAULT_WINDOW_SIZE);
 
 // LCD
-#define LCD_CLK 1
-#define LCD_DIO 0
+#define LCD_CLK 32
+#define LCD_DIO 33
 TM1637Display lcd(LCD_CLK, LCD_DIO);
 const uint8_t LCD_BOOT[] = {
   SEG_C | SEG_D | SEG_E | SEG_F | SEG_G,          // b
@@ -93,6 +95,7 @@ void configLoad(const String &jsonString, bool justThermos=false) {
     config_setPidInitialKi(doc[PREFS_PID_KI] | config.Ki);
     config_setPidInitialKd(doc[PREFS_PID_KD] | config.Kd);
     config_setTimezone(doc[PREFS_TIMEZONE] | config.timezone);
+    config_setDebugPriority(doc[PREFS_DBG_PRIORITY] | config.debugPriority);
   }
   // we can only set these after they are configured 
   // so check if they are allocated before setting these
@@ -118,6 +121,7 @@ String configSerialize(void) {
   JsonDocument doc;
   String jsonString;
 
+  doc[PREFS_DBG_PRIORITY] = config.debugPriority;
   doc[PREFS_HOSTNAME] = config.hostname;
   doc[PREFS_PWM_WINDOW_MS] = config.pwmWindow_ms;
   doc[PREFS_PGM_UPD_INT_MS] = config.programUpdateInterval_ms;
@@ -176,9 +180,14 @@ void setup() {
   alarm_state=false;
   alarm_off();
 
+  // set these to output prior to use
+  pinMode(MAXCS0_PIN, OUTPUT);
+  pinMode(MAXCS1_PIN, OUTPUT);
+
   // initialize the serial for 115200 baud
   Serial.begin(115200);
 
+  // introduce a delay for settling
   delay(QTKILN_BOOT_DELAY_MS);
 
   // lcd setup
@@ -234,15 +243,26 @@ void setup() {
     MQTT_USER, MQTT_PASS, config.mac, MQTT_PORT);
   qtklog.print("MQTT client connected");
   mqttCli->enableDebuggingMessages(config.mqttEnableDebugMessages);
+  mqttCli->enableOTA(config.topic);  // make hacking a little challenging
   mqtt.begin(config.mqttUpdateInterval_ms, mqttCli);
   qtklog.mqttOutputEnable(true);
 
   // initialize the thermocouples and get the first readingings
-  // kiln
-  kiln_thermo = new QTKilnThermo(config.kiln.updateInterval_ms, &kiln_thermocouple, NULL);
+  // setup SPI
+  vSPI->begin();
+  //
+  // kiln phy
+  kiln_MAX31855.begin(); 
+  kiln_MAX31855.setSPIspeed(16000000);
+  // kiln process
+  kiln_thermo = new QTKilnThermo(config.kiln.updateInterval_ms, &kiln_MAX31855, "kiln");
   kiln_thermo->begin();
-  // housing
-  housing_thermo = new QTKilnThermo(config.housing.updateInterval_ms, NULL, &housing_thermocouple);
+  //
+  // housing phy
+  housing_MAX31855.begin();
+  housing_MAX31855.setSPIspeed(16000000);
+  // housing process
+  housing_thermo = new QTKilnThermo(config.housing.updateInterval_ms, &housing_MAX31855, "housing");
   housing_thermo->begin();
   // this is done again here to force these thermocouple setup
   configLoadPrefs(true);
@@ -255,6 +275,24 @@ void setup() {
 
   // turn this on at the end
   mqtt.enable();
+
+  pinMode(TFT_BACKLITE, OUTPUT);
+  digitalWrite(TFT_BACKLITE, HIGH);
+  tft = new Adafruit_ST7789(vSPI, TFT_CS, TFT_DC, TFT_RST);
+  tft->setSPISpeed(16000000);
+  tft->init(240, 280, SPI_MODE0);
+  tft->fillScreen(ST77XX_BLACK);
+
+  tft->setCursor(0, 0);
+  tft->setTextColor(ST77XX_WHITE);
+  tft->setTextWrap(true);
+  tft->print(
+      "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Curabitur "
+      "adipiscing ante sed nibh tincidunt feugiat. Maecenas enim massa, "
+      "fringilla sed malesuada et, malesuada sit amet turpis. Sed porttitor "
+      "neque ut ante pretium vitae malesuada nunc bibendum. Nullam aliquet "
+      "ultrices massa eu hendrerit. Ut sed nisi lorem. In vestibulum purus a "
+      "tortor imperdiet posuere. ");
 }
 
 void lcd_update(float temp, bool bold, bool colon) {
@@ -285,8 +323,8 @@ void mqtt_publish_process_statistics(void) {
 
   //multi_heap_info_t info;
   doc["time"] = millis();
-  doc["max31855"]["highWaterMark"] = kiln_thermo->getTaskHighWaterMark();
-  doc["max6675"]["highWaterMark"] = housing_thermo->getTaskHighWaterMark();
+  doc["kilnThermo"]["highWaterMark"] = kiln_thermo->getTaskHighWaterMark();
+  doc["housingThermo"]["highWaterMark"] = housing_thermo->getTaskHighWaterMark();
   doc["program"]["highWaterMark"] = program.getTaskHighWaterMark();
   doc["pwm"]["highWaterMark"] = pwm.getTaskHighWaterMark();
   doc["mqtt"]["highWaterMark"] = mqtt.getTaskHighWaterMark();
@@ -303,9 +341,9 @@ void mqtt_publish_memory_statistics(void) {
   //multi_heap_info_t info;
   doc["time"] = millis();
   heap_caps_get_info(&info, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT); // internal RAM, memory capable to store data or to create new task
-  doc["mem"]["total_free"] =  info.total_free_bytes;   // total currently free in all non-continues blocks
-  doc["mem"]["min_free"] = info.minimum_free_bytes;  // minimum free ever
-  doc["mem"]["lrgst_free_blk"] = info.largest_free_block;   // largest continues block to allocate big array
+  doc["mem"]["totalFree"] =  info.total_free_bytes;   // total currently free in all non-continues blocks
+  doc["mem"]["minFree"] = info.minimum_free_bytes;  // minimum free ever
+  doc["mem"]["largestFreeBlock"] = info.largest_free_block;   // largest continues block to allocate big array
 
   serializeJson(doc, jsonString);
   snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_STATE);
@@ -585,6 +623,9 @@ void config_setPidInitialKd(double Kd) {
   config.Kd = Kd;
   qtklog.print("PID initial Kd set to %g", config.Kd);
 }
+void config_setDebugPriority(uint16_t debugPriority) {
+  qtklog.setDebugPriorityCutoff(debugPriority);
+}
 void config_setTimezone(const char *timeZone) {
   time_t now;
   struct tm timeinfo;
@@ -597,6 +638,12 @@ void config_setTimezone(const char *timeZone) {
 
   setenv("TZ", timeZone, 1);
   tzset();
+
+  qtklog.debug(QTKLOG_DBG_PRIO_ALWAYS, "setting the ntp server to pool.ntp.org");
+  configTime(0, 0, "pool.ntp.org");
+  if (!localtime_r(&now, &timeinfo)) {
+    qtklog.warn("unable to obtain time");
+  }
 
   // localtime triggers calls to ntp and other things
   localtime_r(&now, &timeinfo);

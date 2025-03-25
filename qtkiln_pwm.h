@@ -4,7 +4,7 @@
 #include "Arduino.h"
 #include "PID_v2.h"
 
-#define QTKILN_PWM_TASK_STACK_SIZE 2048
+#define QTKILN_PWM_TASK_STACK_SIZE 4096
 #define QTKILN_PWM_TASK_PRI tskIDLE_PRIORITY + 2
 
 #define QTKILN_PWM_DEFAULT_WINDOW_SIZE 5000

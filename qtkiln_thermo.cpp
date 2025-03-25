@@ -11,15 +11,15 @@ void thermoTaskFunction(void *pvParameter) {
   thermo->thread();
 }
 
-QTKilnThermo::QTKilnThermo(uint16_t updateInterval_ms, MAX31855 *max31855, MAX6675 *max6675) {
+QTKilnThermo::QTKilnThermo(uint16_t updateInterval_ms, MAX31855 *max31855, const char *name) {
+  _name = name;
   _updateInterval_ms = updateInterval_ms;
   _max31855 = max31855;
-  _max6675 = max6675;
   _lastTime = 0;
   _lastTemp_C = 0;
   _taskHandle = NULL;
   _lowPassFilter.cutoffFrequency_Hz = 1.;
-  if (_max31855 || _max6675) {
+  if (_max31855) {
     _err = 0;
   } else {
     _err++;
@@ -42,29 +42,25 @@ void QTKilnThermo::begin(void) {
 
   if (_max31855) {
     _max31855->begin();
-    while(_max31855->getChipID(MAX31855_FORCE_READ_DATA) != MAX31855_ID) {
-      qtklog.warn("unable to retrieve ID from MAX31855");
-      delay(5000);
+    int _max31855_read = _max31855->read();
+    while(_max31855_read != STATUS_OK) {
+      qtklog.warn("unable to retrieve reading from MAX31855 named %s", _name);
+      _err++;
+      delay(1000);
+      _max31855_read = _max31855->read();
     }
-    qtklog.print("MAX31855 connection verified");
-  } else if (_max6675) {
-    _max6675->begin();
-    while (_max6675->getChipID(MAX6675_FORCE_READ_DATA) != MAX6675_ID) {
-      qtklog.warn("unable to detect MAX6675");
-      delay(5000);
-    }
-    qtklog.print("MAX6675 connection verified");
+    qtklog.print("MAX31855 connection verified after %d failures", _err);
   } else {
     _err++;
     _errno = QTKILN_ERRNO_INVALID_TYPE;
   }
 
   // start on core 1
-  BaseType_t rc = xTaskCreatePinnedToCore(thermoTaskFunction, (_max31855 ? "max31855" : "max65675"),
+  BaseType_t rc = xTaskCreatePinnedToCore(thermoTaskFunction, _name,
 		  QTKILN_THERMO_TASK_STACK_SIZE, (void *)this, QTKILN_THERMO_TASK_PRI,
 		  &_taskHandle, QTKILN_TASK_CORE);
   if (rc != pdPASS || !_taskHandle)
-    qtklog.error("unable to create task handle for %s", (_max31855 ? "max31855" : "max65675"));
+    qtklog.error("unable to create task handle for %s", _name);
 }
 
 TaskHandle_t QTKilnThermo::getTask(void) {
@@ -112,31 +108,6 @@ float QTKilnThermo::getTemperature_C(void) {
   return _lastTemp_C;
 }
 
-void QTKilnThermo::_MAX31855_verbose_diagnose(uint8_t code) {
-    switch (code)
-    {
-      case MAX31855_THERMOCOUPLE_SHORT_TO_VCC:
-        qtklog.warn("thermocouple short to VCC");
-        break;
-
-      case MAX31855_THERMOCOUPLE_SHORT_TO_GND:
-        qtklog.warn("thermocouple short to GND");
-        break;
-
-      case MAX31855_THERMOCOUPLE_NOT_CONNECTED:
-        qtklog.warn("thermocouple not connected");
-        break;
-
-      case MAX31855_THERMOCOUPLE_UNKNOWN:
-        qtklog.warn("thermocouple unknown error");
-        break;
-
-      //case MAX31855_THERMOCOUPLE_READ_FAIL:
-       // qtklog.print("Thermocouple read error, check chip & spi cable");
-        //break;
-    }
-}
-
 // simple first order low pass filter in Hz
 void QTKilnThermo::_filter(float sample) {
   double ts = (millis() - _lowPassFilter.ts) * 1e-3;
@@ -160,36 +131,28 @@ void QTKilnThermo::_filter(float sample) {
 void QTKilnThermo::_doRead(void) {
   //qtklog.debug(QTKLOG_DBG_PRIO_LOW, "_doRead()");
   if (_max31855) {
-    //qtklog.debug(QTKLOG_DBG_PRIO_LOW, "_max31855 0x%x", _max31855);
-    if (_max31855->detectThermocouple(MAX31855_FORCE_READ_DATA) == MAX31855_THERMOCOUPLE_OK) {
-      double tmp =_max31855->getTemperature(MAX31855_FORCE_READ_DATA);
-      if (tmp != MAX31855_ERROR) {
-	qtklog.debug(QTKLOG_DBG_PRIO_LOW, "max31855 = %g", tmp);
-	_lastTemp_C = tmp;
-    	_lastTime = millis();
-      } else {
-	_err++;
-	_errno = QTKILN_ERRNO_READ_ERROR;
-        qtklog.warn("MAX31855 thermocouple read error");
-        return;
-      }
-    } else {
-      _err++;
-      _errno = QTKILN_ERRNO_MAX31855_NOT_DETECTED;
-      qtklog.warn("MAX31855 thermocouple not detected");
-      return;
-    }
-  } else if (_max6675) {
-    //qtklog.debug(QTKLOG_DBG_PRIO_LOW, "max6675 0x%x", _max6675);
-    double tmp = _max6675->getTemperature(MAX6675_FORCE_READ_DATA);
-    if (tmp != MAX6675_ERROR) {
-      qtklog.debug(QTKLOG_DBG_PRIO_LOW, "max6675 = %g", tmp);
+    uint8_t status = _max31855->read();
+    if (status == STATUS_OK) {
+      double tmp =_max31855->getTemperature();
+      qtklog.debug(QTKLOG_DBG_PRIO_LOW, "%s max31855 = %g", _name, tmp);
       _lastTemp_C = tmp;
       _lastTime = millis();
     } else {
+      if (_max31855->shortToGND())
+        qtklog.warn("%s thermocouple has SHORT TO GROUND");
+      if (_max31855->shortToVCC())
+        qtklog.warn("%s thermocouple has SHORT TO VCC");
+      if (_max31855->openCircuit())  
+        qtklog.warn("%s thermocouple has OPEN CIRCUIT");
+      if (_max31855->genericError()) 
+        qtklog.warn("%s thermocouple has GENERIC ERROR");
+      if (_max31855->noRead())       
+        qtklog.warn("%s thermocouple has NO READ");
+      if (_max31855->noCommunication()) 
+        qtklog.warn("%s thermocouple has NO COMMUNICATION");
       _err++;
-      _errno = QTKILN_ERRNO_READ_ERROR;
-      qtklog.warn("MAX6675 thermocouple not responding");
+      _errno = QTKILN_ERRNO_MAX31855_NOT_DETECTED;
+      qtklog.warn("MAX31855 thermocouple not detected");
       return;
     }
   } else {
@@ -199,6 +162,10 @@ void QTKilnThermo::_doRead(void) {
     return;
   }
   _filter(_lastTemp_C);
+}
+
+const char *QTKilnThermo::getName(void) {
+  return _name;
 }
 
 void QTKilnThermo::thread(void) {

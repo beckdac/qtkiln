@@ -2,7 +2,6 @@
 #define QTKILN_THERMO_H
 
 #include "Arduino.h"
-#include "MAX6675.h"
 #include "MAX31855.h"
 
 #define QTKILN_ERRNO_READ_ERROR 1
@@ -19,7 +18,7 @@ extern "C" void thermoTaskFunction(void *pvParameter);
 class QTKilnThermo
 {
   public:
-    QTKilnThermo(uint16_t updateInterval_ms, MAX31855 *max31855, MAX6675 *max6675);
+    QTKilnThermo(uint16_t updateInterval_ms, MAX31855 *max31855, const char *name);
 
     void begin(void);
     unsigned long msSinceLastUpdate(void);
@@ -37,12 +36,13 @@ class QTKilnThermo
     float getFilteredTemperature_C(void);
     float getFilterCutoffFrequency_Hz(void);
     void setFilterCutoffFrequency_Hz(float cutoffFrequency_Hz);
+    const char *getName(void);
 
   private:
     void _MAX31855_verbose_diagnose(uint8_t code);
+    const char *_name;			// name of the device
     uint16_t _updateInterval_ms = 250;	// default update period
-    MAX31855 *_max31855;		// if this is not null, then it is 
-    MAX6675 *_max6675;			//	this type
+    MAX31855 *_max31855;		// pointer to the hardware for this thermo
     unsigned long _lastTime = 0;	// the last time the system was updated
     bool _enabled = false;		// is the system running
     unsigned int _err = 0;		// count of errors

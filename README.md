@@ -49,9 +49,8 @@ WiFi at version 3.1.3
 Networking at version 3.1.3
 Preferences at version 3.1.3
 PID_v2 at version 2.0.1
-MAX31855 Thermocouple at version 1.2.2
+MAX31855_RT
 SPI at version 3.1.3
-MAX6675 Thermocouple at version 1.3.2
 EspMQTTClientFork at version 1.13.4
 ArduinoOTA at version 3.1.3
 Update at version 3.1.3

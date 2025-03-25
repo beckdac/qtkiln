@@ -26,7 +26,7 @@ void ssr_off(void);
 #define PID_KI 0.2
 #define PID_KD 0.1
 
-#define QTKILN_TASK_CORE 0
+#define QTKILN_TASK_CORE 1
 // config structure used by all the modules
 #define MAX_CFG_STR 32
 #define MAC_DEFAULT "c0:ff:ee:ca:fe:42"
@@ -36,6 +36,7 @@ struct Config {
   char mac[MAX_CFG_STR] = MAC_DEFAULT;
   char topic[MAX_CFG_STR] = "";
   char timezone[MAX_CFG_STR] = "GMT-8";
+  uint16_t debugPriority = 0;
   uint16_t pwmWindow_ms = 5000;
   uint16_t mqttUpdateInterval_ms = 1000;
   uint16_t programUpdateInterval_ms = 1000;
@@ -69,6 +70,7 @@ struct Config {
 #define MAC_FMT_STR "%02X%02X%02X%02X%02X%02X"  
 #define QTKILN_BOOT_DELAY_MS 2000
 // preferences and json names
+#define PREFS_DBG_PRIORITY "debugPriority"
 #define PREFS_CONFIG_JSON "config.json"
 #define PREFS_PROGRAM_LIST "programs.json"
 #define CONFIG_RESET "reset"
