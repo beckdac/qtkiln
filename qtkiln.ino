@@ -240,7 +240,7 @@ void setup() {
 
   // start the mqtt client
   mqttCli = new EspMQTTClient(WIFI_SSID, WIFI_PASS, MQTT_BROKER,
-    MQTT_USER, MQTT_PASS, config.mac, MQTT_PORT);
+    MQTT_USER, MQTT_PASS, config.hostname, MQTT_PORT);
   qtklog.print("MQTT client connected");
   mqttCli->enableDebuggingMessages(config.mqttEnableDebugMessages);
   mqttCli->enableOTA(config.topic);  // make hacking a little challenging
@@ -299,44 +299,22 @@ void lcd_update(float temp, bool bold, bool colon) {
 
 // state or preallocated variables for loop
 
-void mqtt_publish_process_statistics(void) {
-  JsonDocument doc;
-  String jsonString;
-
-  //multi_heap_info_t info;
-  doc["time"] = millis();
-  doc["kilnThermo"]["highWaterMark"] = kiln_thermo->getTaskHighWaterMark();
-  doc["housingThermo"]["highWaterMark"] = housing_thermo->getTaskHighWaterMark();
-  doc["program"]["highWaterMark"] = program.getTaskHighWaterMark();
-  doc["pwm"]["highWaterMark"] = pwm.getTaskHighWaterMark();
-  doc["mqtt"]["highWaterMark"] = mqtt.getTaskHighWaterMark();
-
-  serializeJson(doc, jsonString);
-  snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_STATE);
-  mqttCli->publish(buf1, jsonString);
-}
-void mqtt_publish_memory_statistics(void) {
+void mqtt_publish_statistics(void) {
   JsonDocument doc;
   String jsonString;
   multi_heap_info_t info;
 
-  //multi_heap_info_t info;
   doc["time"] = millis();
   heap_caps_get_info(&info, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT); // internal RAM, memory capable to store data or to create new task
   doc["mem"]["totalFree"] =  info.total_free_bytes;   // total currently free in all non-continues blocks
   doc["mem"]["minFree"] = info.minimum_free_bytes;  // minimum free ever
   doc["mem"]["largestFreeBlock"] = info.largest_free_block;   // largest continues block to allocate big array
 
-  serializeJson(doc, jsonString);
-  snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_STATE);
-  mqttCli->publish(buf1, jsonString);
-}
-
-void mqtt_publish_statistics(void) {
-  JsonDocument doc;
-  String jsonString;
-
-  doc["time"] = millis();
+  doc["kilnThermo"]["highWaterMark"] = kiln_thermo->getTaskHighWaterMark();
+  doc["housingThermo"]["highWaterMark"] = housing_thermo->getTaskHighWaterMark();
+  doc["program"]["highWaterMark"] = program.getTaskHighWaterMark();
+  doc["pwm"]["highWaterMark"] = pwm.getTaskHighWaterMark();
+  doc["mqtt"]["highWaterMark"] = mqtt.getTaskHighWaterMark();
   doc["state"]["debugPriorityCutoff"] = qtklog.getDebugPriorityCutoff();
   doc["statistics"]["reallocationCount"] = qtklog.getReallocationCount();
   doc["statistics"]["kilnErrorCount"] = kiln_thermo->getErrorCount();
@@ -552,6 +530,9 @@ void config_setPwmWindow_ms(uint16_t pwmWindow_ms) {
   config.pwmWindow_ms = pwmWindow_ms;
   qtklog.print("PWM update interval = %d ms", config.pwmWindow_ms);
 }
+void config_setMqttHostname(const char *hostname) {
+
+}
 void config_setMqttUpdateInterval_ms(uint16_t mqttUpdateInterval_ms) {
   if (mqttUpdateInterval_ms < MQTT_MIN_UPDATE_MS) {
     qtklog.warn("mqtt update interval must be > %d ms .. forcing to min (%d)",
@@ -722,14 +703,6 @@ void onGetStateMessageReceived(const String &message) {
   if (doc["statistics"] | false) {
     mqtt_publish_statistics();
     qtklog.print("statistics requested via mqtt");
-  }
-  if (doc["memory_statistics"] | false) {
-    mqtt_publish_memory_statistics();
-    qtklog.print("memory statistics requested via mqtt");
-  }
-  if (doc["process_statistics"] | false) {
-    mqtt_publish_process_statistics();
-    qtklog.print("process_statistics requested via mqtt");
   }
   if (doc["programs"] | false) {
     mqtt_publish_programs();

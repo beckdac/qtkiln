@@ -46,7 +46,7 @@ void QTKilnThermo::begin(void) {
     while(_max31855_read != STATUS_OK) {
       qtklog.warn("unable to retrieve reading from MAX31855 named %s", _name);
       _err++;
-      delay(1000);
+      delay(500);
       _max31855_read = _max31855->read();
     }
     qtklog.print("MAX31855 connection verified after %d failures", _err);
@@ -131,8 +131,8 @@ void QTKilnThermo::_filter(float sample) {
 void QTKilnThermo::_doRead(void) {
   //qtklog.debug(QTKLOG_DBG_PRIO_LOW, "_doRead()");
   if (_max31855) {
-    uint8_t status = _max31855->read();
-    if (status == STATUS_OK) {
+    int _max31855_read = _max31855->read();
+    if (_max31855_read == STATUS_OK) {
       double tmp =_max31855->getTemperature();
       qtklog.debug(QTKLOG_DBG_PRIO_LOW, "%s max31855 = %g", _name, tmp);
       _lastTemp_C = tmp;
