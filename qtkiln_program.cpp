@@ -98,7 +98,7 @@ void QTKilnProgram::thread(void) {
 	  }
 	}
 	// ready for a step change?
-	if (now > _nextStepChangeTime_ms || metAFAPConditions) {
+	if (now >= _nextStepChangeTime_ms || metAFAPConditions) {
           qtklog.debug(QTKLOG_DBG_PRIO_ALWAYS, "changing step to %d", _currentStep + 1);
 	  // if we have reached the end of the program stop execution
 	  if (_currentStep + 1 >= _currentProgram->steps) {
@@ -108,6 +108,7 @@ void QTKilnProgram::thread(void) {
 	    // increment the step counter
 	    _currentStep++;
 	    _resetProgramStepVariables(); // sets, for example: _stepStartTime_ms
+	    _stepStartTemp_C = kiln_thermo->getFilteredTemperature_C();
 	    // is the next time change in AFAP
             if (_currentProgram->step[_currentStep].asFastAsPossible) {
 	      _nextStepChangeTime_ms = ULONG_MAX; // end of time for this micro
@@ -119,7 +120,7 @@ void QTKilnProgram::thread(void) {
 	      // set temperature
 	      pwm.setTargetTemperature_C(_currentProgram->step[_currentStep].targetTemperature_C);
             } else {
-	     // calculate the next update interval which is the transition time 
+	      // calculate the next update interval which is the transition time 
 	      // plus the dwell time
 	      _nextStepChangeTime_ms = now + 
 	          _currentProgram->step[_currentStep].transitionWindow_ms + 
@@ -127,8 +128,23 @@ void QTKilnProgram::thread(void) {
 	    }
 	  }
 	}
-	// update the temperature for this step
-	// if not dwell
+	if (!_inDwell) {
+	  // update the temperature for this step
+	  unsigned long now = millis();
+	  // time since the step start
+	  unsigned long deltaT_ms = now - _stepStartTime_ms;
+	  // temperature change over the transition window for this step
+	  float deltaTemp_C = _currentProgram->step[_currentStep].targetTemperature_C - _stepStartTemp_C;
+	  // degree change in C per millisecond, not data type
+	  float dTms = deltaTemp_C / _currentProgram->step[_currentStep].transitionWindow_ms;
+	  // new temperature from y = mx+b
+	  float newT_C = _stepStartTemp_C + (dTms * deltaT_ms);
+	  qtklog.debug(QTKLOG_DBG_PRIO_ALWAYS, "running program %s changing set point to %g", _currentProgram->name, newT_C);
+	  pwm.setTargetTemperature_C(newT_C);
+	} else {
+	  // redundant
+	  // pwm.setTargetTemperature_C(_currentProgram->step[_currentStep].targetTemperature_C);
+	}
       }
     }
     xDelay = pdMS_TO_TICKS(_updateInterval_ms);
@@ -166,8 +182,8 @@ struct QTKilnProgramStruct *QTKilnProgram::_parseProgram(const String &program) 
     return NULL;
   }
   const char *name = doc["name"] | "";
-  if (strlen(name) > 15) {
-    qtklog.warn("program name %s is too long, max length is 15 characters", name);
+  if (strlen(name) > QTKILN_MAX_PROGRAM_NAME_LEN) {
+    qtklog.warn("program name %s is too long, max length is %d characters", name, QTKILN_MAX_PROGRAM_NAME_LEN);
     return NULL;
   }
   // find the number of steps so they can be allocated
@@ -177,6 +193,7 @@ struct QTKilnProgramStruct *QTKilnProgram::_parseProgram(const String &program) 
     return NULL;
   }
   QTKilnProgramStruct *new_program = (QTKilnProgramStruct *)malloc(sizeof(struct QTKilnProgramStruct));
+  strncpy(new_program->name, name, QTKILN_MAX_PROGRAM_NAME_LEN);
   new_program->steps = steps;
   new_program->step = (QTKilnProgramStructStep *)malloc(sizeof(struct QTKilnProgramStructStep) * steps);
   memset(new_program->step, 0, sizeof(struct QTKilnProgramStructStep));
@@ -217,6 +234,14 @@ struct QTKilnProgramStruct *QTKilnProgram::_parseProgram(const String &program) 
   }
   _debugPrint(new_program);
   return new_program;
+}
+
+bool QTKilnProgram::isProgramLoaded(void) {
+  return (_currentProgram != NULL);
+}
+
+const char *QTKilnProgram::getLoadedProgramName(void) {
+  return _currentProgram->name;
 }
 
 void QTKilnProgram::_debugPrint(QTKilnProgramStruct *prg) {
@@ -295,6 +320,7 @@ void QTKilnProgram::start(void) {
     _running = true;
     _currentStep = 0;
     _resetProgramStepVariables();
+    _stepStartTemp_C = kiln_thermo->getFilteredTemperature_C();
   }
 }
 

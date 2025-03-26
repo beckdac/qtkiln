@@ -11,7 +11,7 @@
 #define PGM_DWELL_MIN "dwell_min"
 
 #define QTKILN_PROGRAM_TASK_STACK_SIZE 4096
-#define QTKILN_PROGRAM_TASK_PRI tskIDLE_PRIORITY + 3
+#define QTKILN_PROGRAM_TASK_PRI tskIDLE_PRIORITY + 4
 
 #define QTKILN_PROGRAM_DEFAULT_UPDATE_INTERVAL_MS 1000
 
@@ -24,7 +24,10 @@ struct QTKilnProgramStructStep {
   unsigned long dwell_ms;
 };
 
+// limit from preferences key length
+#define QTKILN_MAX_PROGRAM_NAME_LEN 15
 struct QTKilnProgramStruct {
+  char name[QTKILN_MAX_PROGRAM_NAME_LEN];
   uint8_t steps;
   struct QTKilnProgramStructStep *step;
 };
@@ -50,6 +53,8 @@ class QTKilnProgram
     UBaseType_t getTaskHighWaterMark(void);
     void setUpdateInterval_ms(uint16_t updateInterval_ms);
     uint16_t getUpdateInterval_ms(void);
+    bool isProgramLoaded(void);
+    const char *getLoadedProgramName(void);
 
   private:
     struct QTKilnProgramStruct *_parseProgram(const String &program);
@@ -66,6 +71,7 @@ class QTKilnProgram
     bool _currentAFAPUp = true;		// is our current as fast as possible about going up in T?
     unsigned long _nextStepChangeTime_ms;// time in device ms that we change to the next step
     unsigned long _stepStartTime_ms;	// when we started this step
+    float _stepStartTemp_C;		// temp when this step was started
     bool _inDwell = false;		// are we in the dwell state of this step
     TaskHandle_t _taskHandle = NULL;    // for managing the task later
 };

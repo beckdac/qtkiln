@@ -151,6 +151,9 @@ void configReset(void) {
   preferences.begin(PREFS_NAMESPACE, false);
   preferences.clear();
   preferences.end();
+  preferences.begin(QTPROGRAM_NAMESPACE, false);
+  preferences.clear();
+  preferences.end();
 }
 
 void configLoadPrefs(bool justThermos) {
@@ -248,6 +251,13 @@ void setup() {
   mqttCli = new EspMQTTClient(config.wifiSsid, config.wifiPassword, config.mqttHostIp,
                    config.mqttUsername, config.mqttPassword, config.hostname, config.mqttPort);
   qtklog.print("MQTT client connected");
+  // send a last will message that removes the entity
+  // not exactly sure how to set this up
+  if (config.homeAss.enabled) {
+    qtklog.debug(QTKLOG_DBG_PRIO_ALWAYS, "enabling last will for HomeAssistant entity management");
+    snprintf(buf1, MAX_BUF, config.homeAss.configTopicFmt, "sensor", "qtkiln", config.mac);
+    mqttCli->enableLastWillMessage(buf1, "{}");
+  }
   mqttCli->enableDebuggingMessages(config.mqttEnableDebugMessages);
   mqttCli->enableOTA(config.topic);  // make hacking a little challenging
   mqtt.begin(config.mqttUpdateInterval_ms, mqttCli);
@@ -720,9 +730,26 @@ void onSetStateMessageReceived(const String &message) {
       if (Kd < 0)
         Kd = 0;
       updateTunings = true;
+    } else if (strcmp(kv.key().c_str(), "alarm") == 0) {
+      bool alarm_set = doc["alarm"] | false;
+      if (alarm_set)
+        alarm_on();
+      else
+        alarm_off();
     } else if (strcmp(kv.key().c_str(), "program") == 0) {
       const char *name = doc["program"];
       program.loadProgram(name);
+    } else if (strcmp(kv.key().c_str(), "run_program") == 0) {
+      const char *state = doc["run_program"] | false;
+      if (state && !program.isProgramLoaded()) {
+        qtklog.warn("run_program sent but no program loaded");
+      } else if (state && !program.isRunning()) {
+        qtklog.debug(QTKLOG_DBG_PRIO_ALWAYS, "starting to run program %s", program.getLoadedProgramName());
+        program.run();
+      } else if (!state && program.isRunning()) {
+        qtklog.debug(QTKLOG_DBG_PRIO_ALWAYS, "stopping program %s", program.getLoadedProgramName());
+        program.stop();
+      }
     }
   }
   if (startPid) {
@@ -767,6 +794,7 @@ void onProgramMessageReceived(const String &message) {
     return;
   }
   // if it has a name object then we are setting the program
+// need to remove the strings from this
   if (doc["name"].is<const char*>()) {
     const char *name = doc["name"];
     bool validProgram = program.set(name, message);
@@ -775,6 +803,47 @@ void onProgramMessageReceived(const String &message) {
     } 
   }
 }
+
+// need to remove the strings from this
+void homeAss_begin(void) {
+  JsonDocument doc;
+  String jsonString;
+  char buf[MAX_BUF], buf2[MAX_BUF];
+
+  snprintf(buf, MAX_BUF, config.homeAss.deviceIdFmt, config.mac);
+  doc["dev"]["ids"] = buf;
+  doc["dev"]["name"] = buf;
+  doc["dev"]["mf"] = config.homeAss.manufacturer;
+  doc["dev"]["mdl"] = config.homeAss.model;
+  doc["dev"]["sw"] = config.homeAss.softwareRev;
+  doc["dev"]["hw"] = config.homeAss.hardwareRev;
+  doc["dev"]["sn"] = config.mac;
+  doc["o"]["name"] = config.homeAss.originName;
+  doc["o"]["sw"] = config.homeAss.softwareRev;
+  snprintf(buf, MAX_BUF, config.homeAss.componentFmt, config.mac, "kiln");
+  doc[buf]["p"] = "sensor";
+  doc[buf]["device_class"] = "temperature";
+  doc[buf]["unit_of_measurement"] = "°C";
+  doc[buf]["value_template"] = "{{ value_json.kiln.temp_C }}";
+  snprintf(buf2, MAX_BUF, "%s_t", buf);
+  doc[buf]["unique_id"] = buf2;
+  snprintf(buf, MAX_BUF, config.homeAss.componentFmt, config.mac, "housing");
+  doc[buf]["p"] = "sensor";
+  doc[buf]["device_class"] = "temperature";
+  doc[buf]["unit_of_measurement"] = "°C";
+  doc[buf]["value_template"] = "{{ value_json.housing.temp_C }}";
+  snprintf(buf2, MAX_BUF, "%s_t", buf);
+  doc[buf]["unique_id"] = buf2;
+  snprintf(buf, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_STATE);
+  doc["state_topic"] = buf;
+  doc["qos"] = 2;
+
+  serializeJson(doc, jsonString);
+
+  snprintf(buf1, MAX_BUF, config.homeAss.configTopicFmt, "sensor", "qtkiln", config.mac);
+  mqttCli->publish(buf1, jsonString, true);
+}
+
 // when the connection to the mqtt has completed
 void onConnectionEstablished(void) {
   char topic[MAX_BUF];
@@ -787,4 +856,9 @@ void onConnectionEstablished(void) {
   mqttCli->subscribe(topic, onProgramMessageReceived);
   snprintf(topic, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_SET);
   mqttCli->subscribe(topic, onSetStateMessageReceived);
+
+  // send out the home assistant mqtt discovery messages
+  if (config.homeAss.enabled) {
+    homeAss_begin();
+  }
 }

@@ -31,7 +31,7 @@ void ssr_off(void);
 
 #define QTKILN_TASK_CORE 1
 // config structure used by all the modules
-#define MAX_CFG_STR 32
+#define MAX_CFG_STR 64
 #define MAC_DEFAULT "c0:ff:ee:ca:fe:42"
 #define HOSTNAME_DEFAULT "qtkiln_coffeecafe42"
 struct Config {
@@ -56,6 +56,20 @@ struct Config {
     uint16_t updateInterval_ms = 250;
     float filterCutoffFrequency_Hz = 1.;
   } kiln, housing;
+  struct HomeAssistantConfig {
+    bool enabled = true;
+    char configTopicFmt[MAX_CFG_STR] = "homeassistant/%s/%s_%s/config";
+    char deviceIdFmt[MAX_CFG_STR] = "qtkiln_%s";
+    char deviceNameFmt[MAX_CFG_STR] = "qtkiln_%s";
+    char componentFmt[MAX_CFG_STR] = "qtkiln_%s_cmp_%s";
+    char model[MAX_CFG_STR] = "qtkiln basic";
+    char manufacturer[MAX_CFG_STR] = "koren labs foundry";
+    char softwareRev[MAX_CFG_STR] = "basic v1.0";
+    char hardwareRev[MAX_CFG_STR] = "qtkiln basic";
+    char originName[MAX_CFG_STR] = "qtkiln basic v1.0";
+    char originSoftwareRev[MAX_CFG_STR] = "qtkiln basic software v1.0";
+    char originUrl[MAX_CFG_STR] = "https://github.com/beckdac/qtkiln";
+  } homeAss;
 };
 
 // global temperature maxes
