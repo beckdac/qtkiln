@@ -27,7 +27,7 @@ void config_setThermoFilterCutoffFrequency_Hz(QTKilnThermo *thermo, float cutoff
 QTKilnLog qtklog(true);
 
 // alarm pin
-#define ALARM_PIN 4
+#define ALARM_PIN 25
 bool alarm_state = false;
 
 // thermocouple phy
@@ -52,13 +52,13 @@ EspMQTTClient *mqttCli = NULL;
 QTKilnMQTT mqtt;
 
 // PWM object
-#define SSR_PIN 17
+#define SSR_PIN 26
 bool ssr_state = false;
 QTKilnPWM pwm(QTKILN_PWM_DEFAULT_WINDOW_SIZE);
 
 // LCD
-#define LCD_CLK 32
-#define LCD_DIO 33
+#define LCD_CLK 33
+#define LCD_DIO 32
 TM1637Display lcd(LCD_CLK, LCD_DIO);
 const uint8_t LCD_BOOT[] = {
   SEG_C | SEG_D | SEG_E | SEG_F | SEG_G,          // b
@@ -275,24 +275,6 @@ void setup() {
 
   // turn this on at the end
   mqtt.enable();
-
-  pinMode(TFT_BACKLITE, OUTPUT);
-  digitalWrite(TFT_BACKLITE, HIGH);
-  tft = new Adafruit_ST7789(vSPI, TFT_CS, TFT_DC, TFT_RST);
-  tft->setSPISpeed(16000000);
-  tft->init(240, 280, SPI_MODE0);
-  tft->fillScreen(ST77XX_BLACK);
-
-  tft->setCursor(0, 0);
-  tft->setTextColor(ST77XX_WHITE);
-  tft->setTextWrap(true);
-  tft->print(
-      "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Curabitur "
-      "adipiscing ante sed nibh tincidunt feugiat. Maecenas enim massa, "
-      "fringilla sed malesuada et, malesuada sit amet turpis. Sed porttitor "
-      "neque ut ante pretium vitae malesuada nunc bibendum. Nullam aliquet "
-      "ultrices massa eu hendrerit. Ut sed nisi lorem. In vestibulum purus a "
-      "tortor imperdiet posuere. ");
 }
 
 void lcd_update(float temp, bool bold, bool colon) {
