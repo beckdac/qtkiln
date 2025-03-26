@@ -35,7 +35,7 @@ class QTKilnProgram
     QTKilnProgram();
     void begin();
     void loop();
-    void set(const String &name, const String &program);
+    bool set(const String &name, const String &program);
     struct QTKilnProgramStruct *get(const char *name);
     String getJSON(const char *name);
     void start();

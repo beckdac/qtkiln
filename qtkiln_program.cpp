@@ -159,6 +159,18 @@ struct QTKilnProgramStruct *QTKilnProgram::_parseProgram(const String &program) 
     qtklog.warn("the following error occurred: %s", error.c_str());
     return NULL;
   }
+
+  // make sure there is a name entity and it is valid
+  if (!doc["name"].is<const char *>()) {
+    qtklog.warn("unable to find the program name in the program");
+    return NULL;
+  }
+  const char *name = doc["name"] | "";
+  if (strlen(name) > 15) {
+    qtklog.warn("program name %s is too long, max length is 15 characters", name);
+    return NULL;
+  }
+  // find the number of steps so they can be allocated
   uint8_t steps = doc["steps"] | 0;
   if (!steps) {
     qtklog.warn("unable to find the number of steps in the program");
@@ -223,7 +235,7 @@ void QTKilnProgram::_saveProgram(const String &name, const String &program) {
   preferences.end();
 }
 
-void QTKilnProgram::set(const String &name, const String &program){
+bool QTKilnProgram::set(const String &name, const String &program){
   struct QTKilnProgramStruct *validProgram;
   validProgram = _parseProgram(program);
   if (validProgram) {
@@ -231,7 +243,9 @@ void QTKilnProgram::set(const String &name, const String &program){
     _saveProgram(name, program);
   } else {
     qtklog.warn("unabled to save program %s because it failed verification", name.c_str());
+    return false;
   }
+  return true;
 }
 
 String QTKilnProgram::getJSON(const char *name) {

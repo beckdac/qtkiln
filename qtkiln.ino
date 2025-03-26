@@ -745,16 +745,16 @@ void onGetStateMessageReceived(const String &message) {
   }
   // if it has a name object then we are setting the program
   if (doc["statistics"] | false) {
-    mqtt_publish_statistics();
     qtklog.print("statistics requested via mqtt");
+    mqtt_publish_statistics();
   }
   if (doc["programs"] | false) {
-    mqtt_publish_programs();
     qtklog.print("programs requested via mqtt");
+    mqtt_publish_programs();
   }
   if (doc["config"] | false) {
-    mqtt_publish_config();
     qtklog.print("config requested via mqtt");
+    mqtt_publish_config();
   }
 }
 void onProgramMessageReceived(const String &message) {
@@ -769,8 +769,8 @@ void onProgramMessageReceived(const String &message) {
   // if it has a name object then we are setting the program
   if (doc["name"].is<const char*>()) {
     const char *name = doc["name"];
-    program.set(name, message);
-    if (!programNameInList(name)) {
+    bool validProgram = program.set(name, message);
+    if (validProgram && !programNameInList(name)) {
        addProgramNameToList(name);
     } 
   }
