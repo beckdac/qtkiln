@@ -41,13 +41,7 @@ MAX31855 housing_MAX31855(MAXCS1_PIN, vSPI);
 QTKilnThermo *kiln_thermo = NULL;
 QTKilnThermo *housing_thermo = NULL;
 
-// WiFi credentials
-#include "wifi_cred.h"
-const char *ssid = WIFI_SSID;
-const char *sspw = WIFI_PASS;
-
-// MQTT server
-#include "mqtt_cred.h"
+// MQTT server obj and process
 EspMQTTClient *mqttCli = NULL;
 QTKilnMQTT mqtt;
 
@@ -86,6 +80,12 @@ void configLoad(const String &jsonString, bool justThermos=false) {
     return;
   }
   if (!justThermos) {
+    config_setWifiSsid(doc[PREFS_WIFI_SSID] | config.wifiSsid);
+    config_setWifiPassword(doc[PREFS_WIFI_PWD] | config.wifiPassword);
+    config_setMqttHostIp(doc[PREFS_MQTT_HOSTIP] | config.mqttHostIp);
+    config_setMqttUsername(doc[PREFS_MQTT_USERNAME] | config.mqttUsername);
+    config_setMqttPassword(doc[PREFS_MQTT_PWD] | config.mqttPassword);
+    config_setMqttPort(doc[PREFS_MQTT_PORT] | config.mqttPort);
     config_setHostname(doc[PREFS_HOSTNAME] | config.hostname);
     config_setPwmWindow_ms(doc[PREFS_PWM_WINDOW_MS] | config.pwmWindow_ms);
     config_setMqttUpdateInterval_ms(doc[PREFS_MQTT_UPD_INT_MS] | config.mqttUpdateInterval_ms);
@@ -123,6 +123,12 @@ String configSerialize(void) {
 
   doc[PREFS_DBG_PRIORITY] = config.debugPriority;
   doc[PREFS_HOSTNAME] = config.hostname;
+  doc[PREFS_WIFI_SSID] = config.wifiSsid;
+  //doc[PREFS_WIFI_PWD] = config.wifiPassword;  don't show this for security
+  doc[PREFS_MQTT_HOSTIP] = config.mqttHostIp;
+  doc[PREFS_MQTT_USERNAME] = config.mqttUsername;
+  //doc[PREFS_MQTT_PWD] = config.mqttPassword;  don't show this for security
+  doc[PREFS_MQTT_PORT] = config.mqttPort;
   doc[PREFS_PWM_WINDOW_MS] = config.pwmWindow_ms;
   doc[PREFS_PGM_UPD_INT_MS] = config.programUpdateInterval_ms;
   doc[PREFS_MQTT_UPD_INT_MS] = config.mqttUpdateInterval_ms;
@@ -203,7 +209,7 @@ void setup() {
 
   // connect to wifi
   WiFi.setHostname(config.hostname);
-  WiFi.begin(ssid, sspw);
+  WiFi.begin(config.wifiSsid, config.wifiPassword);
   while (WiFi.status() != WL_CONNECTED) {
     delay(WIFI_SETUP_DELAY_MS);
   }
@@ -239,8 +245,8 @@ void setup() {
   program.begin(); 
 
   // start the mqtt client
-  mqttCli = new EspMQTTClient(WIFI_SSID, WIFI_PASS, MQTT_BROKER,
-    MQTT_USER, MQTT_PASS, config.hostname, MQTT_PORT);
+  mqttCli = new EspMQTTClient(config.wifiSsid, config.wifiPassword, config.mqttHostIp,
+                   config.mqttUsername, config.mqttPassword, config.hostname, config.mqttPort);
   qtklog.print("MQTT client connected");
   mqttCli->enableDebuggingMessages(config.mqttEnableDebugMessages);
   mqttCli->enableOTA(config.topic);  // make hacking a little challenging
@@ -379,6 +385,11 @@ void addProgramNameToList(const char *name) {
   preferences.putString(PREFS_PROGRAM_LIST, jsonOut);
   preferences.end();
   qtklog.print("wrote program list in JSON to preferences: %s", jsonOut.c_str());
+}
+
+void mqtt_publish_config(void) {
+  snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_CONFIG);
+  mqttCli->publish(buf1, configSerialize());
 }
 
 void mqtt_publish_programs(void) {
@@ -530,8 +541,41 @@ void config_setPwmWindow_ms(uint16_t pwmWindow_ms) {
   config.pwmWindow_ms = pwmWindow_ms;
   qtklog.print("PWM update interval = %d ms", config.pwmWindow_ms);
 }
-void config_setMqttHostname(const char *hostname) {
-
+const char *config_setWifiSsid(void) {
+  return config.wifiSsid;
+}
+void config_setWifiSsid(const char *wifiSsid) {
+  strncpy(config.wifiSsid, wifiSsid, MAX_CFG_STR);
+}
+const char *config_setWifiPassword(void) {
+  return config.wifiPassword;
+}
+void config_setWifiPassword(const char *wifiPassword) {
+  strncpy(config.wifiPassword, wifiPassword, MAX_CFG_STR);
+}
+const char *config_getMqttHostIp(void) {
+  return config.mqttHostIp;
+}
+void config_setMqttHostIp(const char *hostIp) {
+  strncpy(config.mqttHostIp, hostIp, MAX_CFG_STR);
+}
+const char *config_getMqttPassword(void) {
+  return config.mqttPassword;
+}
+void config_setMqttPassword(const char *password) {
+  strncpy(config.mqttPassword, password, MAX_CFG_STR);
+}
+const char *config_getMqttUsername(void) {
+  return config.mqttUsername;
+}
+void config_setMqttUsername(const char *username) {
+  strncpy(config.mqttUsername, username, MAX_CFG_STR);
+}
+uint16_t config_getMqttPort(void) {
+  return config.mqttPort;
+}
+void config_setMqttPort(uint16_t port) {
+  config.mqttPort = port;
 }
 void config_setMqttUpdateInterval_ms(uint16_t mqttUpdateInterval_ms) {
   if (mqttUpdateInterval_ms < MQTT_MIN_UPDATE_MS) {
@@ -707,6 +751,10 @@ void onGetStateMessageReceived(const String &message) {
   if (doc["programs"] | false) {
     mqtt_publish_programs();
     qtklog.print("programs requested via mqtt");
+  }
+  if (doc["config"] | false) {
+    mqtt_publish_config();
+    qtklog.print("config requested via mqtt");
   }
 }
 void onProgramMessageReceived(const String &message) {

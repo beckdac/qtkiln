@@ -1,6 +1,9 @@
 #ifndef _QTKILN_H_
 #define _QTKILN_H_
 
+#include "wifi_cred.h"
+#include "mqtt_cred.h"
+
 // prototypes
 void config_setPwmWindow_ms(uint16_t pwm_update_int_ms);
 void config_setMqttUpdateInterval_ms(uint16_t mqtt_update_int_ms);
@@ -32,6 +35,12 @@ void ssr_off(void);
 #define MAC_DEFAULT "c0:ff:ee:ca:fe:42"
 #define HOSTNAME_DEFAULT "qtkiln_coffeecafe42"
 struct Config {
+  char wifiSsid[MAX_CFG_STR] = WIFI_SSID;
+  char wifiPassword[MAX_CFG_STR] = WIFI_PASS;
+  char mqttHostIp[MAX_CFG_STR] = MQTT_BROKER;
+  uint16_t mqttPort = MQTT_PORT;
+  char mqttUsername[MAX_CFG_STR] = MQTT_USER;
+  char mqttPassword[MAX_CFG_STR] = MQTT_PASS;
   char hostname[MAX_CFG_STR] = HOSTNAME_DEFAULT;
   char mac[MAX_CFG_STR] = MAC_DEFAULT;
   char topic[MAX_CFG_STR] = "";
@@ -70,6 +79,12 @@ struct Config {
 #define MAC_FMT_STR "%02X%02X%02X%02X%02X%02X"  
 #define QTKILN_BOOT_DELAY_MS 2000
 // preferences and json names
+#define PREFS_WIFI_SSID "wifiSsid"
+#define PREFS_WIFI_PWD "wifiPassword"
+#define PREFS_MQTT_HOSTIP "mqttHostIp"
+#define PREFS_MQTT_USERNAME "mqttUsername"
+#define PREFS_MQTT_PWD "mqttPassword"
+#define PREFS_MQTT_PORT "mqttPort"
 #define PREFS_DBG_PRIORITY "debugPriority"
 #define PREFS_CONFIG_JSON "config.json"
 #define PREFS_PROGRAM_LIST "programs.json"
