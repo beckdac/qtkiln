@@ -93,6 +93,7 @@ void QTKilnMQTT::_publish_state(bool active, bool pid_current) {
     doc["pidEnabled"] = pwm.isEnabled();
     doc["targetTemp_C"] = pwm.getTargetTemperature_C();
     doc["dutyCycle_%"] = pwm.getDutyCycle();
+    doc["output_ms"] = pwm.getOutput_ms();
   }
   if (pwm.isEnabled() || pid_current) {
     double Kp = pwm.getKp(), Ki = pwm.getKi(), Kd = pwm.getKd();

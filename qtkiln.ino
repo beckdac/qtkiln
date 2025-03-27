@@ -429,13 +429,13 @@ void mqtt_publish_programs(void) {
 }
 
 void alarm_on(void) {
-  qtklog.debug(QTKLOG_DBG_PRIO_ALWAYS, "alarm on called");
+  qtklog.debug(QTKLOG_DBG_PRIO_HIGH, "alarm on called");
   alarm_state = true;
   digitalWrite(ALARM_PIN, LOW);
 }
 
 void alarm_off(void) {
-  qtklog.debug(QTKLOG_DBG_PRIO_ALWAYS, "alarm off called");
+  qtklog.debug(QTKLOG_DBG_PRIO_HIGH, "alarm off called");
   alarm_state = false;
   digitalWrite(ALARM_PIN, HIGH);
 }
@@ -739,7 +739,12 @@ void onSetStateMessageReceived(const String &message) {
       else
         alarm_off();
     } else if (strcmp(kv.key().c_str(), "alarmOnSSR") == 0) {
-      bool config.alarmOnSSR = doc["alarmOnSSR"] | false;
+      config.alarmOnSSR = doc["alarmOnSSR"] | false;
+    } else if (strcmp(kv.key().c_str(), "pidTuning") == 0) {
+      if (doc["pidTuning"] | false)
+        pwm.startTuning();
+      else
+        pwm.stopTuning();
     } else if (strcmp(kv.key().c_str(), "restart") == 0) {
       bool restart = doc["restart"] | false;
       qtklog.warn("received restart request");

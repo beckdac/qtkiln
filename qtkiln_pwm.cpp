@@ -122,6 +122,10 @@ float QTKilnPWM::getDutyCycle(void) {
   return 100. * (float)_output_ms / (float)_windowSize_ms;
 }
 
+uint16_t QTKilnPWM::getOutput_ms(void) {
+  return _output_ms;
+}
+
 void QTKilnPWM::thread(void) {
   TickType_t xDelay;
   unsigned long now;
@@ -137,11 +141,7 @@ void QTKilnPWM::thread(void) {
         _windowStartTime += _windowSize_ms;
       }
       if (!_tuning.enabled) {
-        if (!_pid->Compute()) {
-          qtklog.debug(QTKLOG_DBG_PRIO_LOW, "compute called but didn't require an update, consider lengthening the output interval");
-        } else {
-	  qtklog.debug(QTKLOG_DBG_PRIO_ALWAYS, "compute called for a reason (output = %g)", _output);
-	}
+	_pid->Compute(); // most of these will be noop with false return
       } else {
 	switch (_tuning.tuner->Run()) {
           case sTune::TunerStatus::sample:  // once per sample during test
@@ -149,13 +149,20 @@ void QTKilnPWM::thread(void) {
 	    break;
 	  case sTune::TunerStatus::tunings: // done when the tuning is complete
 	    _tuning.tuner->GetAutoTunings(&_Kp, &_Ki, &_Kd);
+	    qtklog.print("PID auto tuning complete and Kp = %g, Ki = %g, Kd = %d", _Kp, _Ki, _Kd);
+	    _pid->Reset();
+	    qtklog.print("updating configuration with initial tunings, consider saving");
+            config_setPidInitialKp(_Kp);
+	    config_setPidInitialKi(_Ki);
+            config_setPidInitialKd(_Kd);
+	    qtklog.print("returning control to PID with new tunings");
 	    _pid->SetMode(QuickPID::Control::automatic);
 	    _pid->SetProportionalMode(QuickPID::pMode::pOnMeas);
 	    _pid->SetAntiWindupMode(QuickPID::iAwMode::iAwClamp);
 	    _pid->SetTunings(_Kp, _Ki, _Kd);
 	    break;
 	  case sTune::TunerStatus::runPid: // once per sample after tuning
-	    _pid->Compute();
+	    _pid->Compute(); // most of these will be noop with false return
 	    break;
 	}
       }
@@ -226,6 +233,10 @@ void QTKilnPWM::startTuning(void) {
     qtklog.warn("PID tuner invoked with no PID controller available");
     return;
   }
+  if (getTargetTemperature_C() == 0) {
+    qtklog.warn("current target temperature is 0, tuning not available");
+    return;
+  }
   // create a new tuner
   if (!_tuning.tuner)
     _tuning.tuner = new sTune(&_input, &_output, sTune::TuningMethod::ZN_PID, 
@@ -241,10 +252,12 @@ void QTKilnPWM::startTuning(void) {
 		           _tuning.samples);
   _tuning.tuner->SetEmergencyStop(_tuning.tempLimit);
 
+  enable();
   _tuning.enabled = true;
 }
 
 void QTKilnPWM::stopTuning(void) {
+  disable();
   _tuning.enabled = false;
 }
 
