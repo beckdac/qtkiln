@@ -4,7 +4,8 @@
 #include "qtkiln_program.h"
 #include "qtkiln.h"
 
-#include <PID_v2.h>
+#include <QuickPID.h>
+#include <sTune.h>
 
 extern Config config;
 extern QTKilnLog qtklog;
@@ -22,12 +23,19 @@ void pwmPWMFunction(void *pvParameter) {
 QTKilnPWM::QTKilnPWM(uint16_t windowSize_ms) {
   _windowSize_ms = windowSize_ms;
   _lastTime = 0;
+  _input = 0;
+  _output = 0;
+  _tuning.tuner = NULL;
+  _tuning.enabled = false;
+  _targetTemperature_C = 0;
+  _setpoint_flt_C = 0;
   _taskHandle = NULL;
 }
 
 void QTKilnPWM::setWindowSize_ms(uint16_t windowSize_ms) {
   _windowSize_ms = windowSize_ms;
   _pid->SetOutputLimits(0, _windowSize_ms);
+  _pid->SetSampleTimeUs(_windowSize_ms * 1000);
   qtklog.debug(0, "pwm update interval modified to %d ms", _windowSize_ms);
 }
 
@@ -37,8 +45,11 @@ uint16_t QTKilnPWM::getWindowSize_ms(void) {
 
 void QTKilnPWM::begin(void) {
   qtklog.print("intializing new pid/pwm with window size %d", _windowSize_ms);
-  _pid = new PID_v2(config.Kp, config.Ki, config.Kd, PID::Direct);
-  _pid->SetOutputLimits(0, config.pwmWindow_ms);
+  _pid = new QuickPID(&_input, &_output, &_setpoint_flt_C, config.Kp, config.Ki, config.Kd, 
+		  QuickPID::pMode::pOnError, QuickPID::dMode::dOnMeas, QuickPID::iAwMode::iAwClamp,
+		  QuickPID::Action::direct);
+  _pid->SetOutputLimits(0, _windowSize_ms);
+  _pid->SetSampleTimeUs(_windowSize_ms * 1000);
 
   BaseType_t rc = xTaskCreatePinnedToCore(pwmPWMFunction, "pwm",
 		  QTKILN_PWM_TASK_STACK_SIZE, (void *)this, QTKILN_PWM_TASK_PRI,
@@ -55,18 +66,31 @@ void QTKilnPWM::enable(void) {
   bool wasEnabled = _enabled;
   _enabled = true;
   if (!wasEnabled) {
-    _pid->SetTunings(config.Kp, config.Ki, config.Kd);
-    _pid->SetSampleTime(_windowSize_ms);
-    _pid->Start(kiln_thermo->getFilteredTemperature_C(), 0, _targetTemperature_C);
+    _input = kiln_thermo->getFilteredTemperature_C();
+    _setpoint_flt_C = _targetTemperature_C;
+    _pid->SetMode(QuickPID::Control::automatic);
+    //_pid->SetProportionalMode(QuickPID::pMode::pOnMeas);
+    _pid->Initialize();
+    //_pid->Compute();
     _windowStartTime = millis();
     qtklog.debug(0, "PID is being enabled for the PWM task");
   }
+}
+
+void QTKilnPWM::resetPID(void) {
+  if (_enabled) {
+    qtklog.warn("cannot reset the PID parameters while control is enabled");
+    return;
+  }
+  if (_pid)
+    _pid->Reset();
 }
 
 void QTKilnPWM::disable(void) {
   bool wasEnabled = _enabled;
   _enabled = false;
   if (wasEnabled) {
+    _pid->SetMode(QuickPID::Control::manual);
     ssr_off();
     qtklog.debug(0, "PID is being disabled for the PWM task");
   }
@@ -82,6 +106,7 @@ uint16_t QTKilnPWM::getTargetTemperature_C() {
 
 void QTKilnPWM::setTargetTemperature_C(uint16_t targetTemperature_C) {
   _targetTemperature_C = targetTemperature_C;
+  _setpoint_flt_C = _targetTemperature_C;
 }
 
 unsigned long QTKilnPWM::msSinceLastUpdate(void) {
@@ -99,25 +124,62 @@ float QTKilnPWM::getDutyCycle(void) {
 
 void QTKilnPWM::thread(void) {
   TickType_t xDelay;
-  double tmp;
   unsigned long now;
 
   while (1) {
     if (_enabled && _pid) {
+      if (kiln_thermo)
+        _input = kiln_thermo->getFilteredTemperature_C();
+      else
+	qtklog.warn("kiln_thermo not available in the pwm main loop");
       now = millis();
       while (now - _windowStartTime > _windowSize_ms) {
         _windowStartTime += _windowSize_ms;
       }
-      tmp = _pid->Run(kiln_thermo->getFilteredTemperature_C());
-      if (isnan(tmp)) {
+      if (!_tuning.enabled) {
+        if (!_pid->Compute()) {
+          qtklog.debug(QTKLOG_DBG_PRIO_LOW, "compute called but didn't require an update, consider lengthening the output interval");
+        } else {
+	  qtklog.debug(QTKLOG_DBG_PRIO_ALWAYS, "compute called for a reason (output = %g)", _output);
+	}
+      } else {
+	switch (_tuning.tuner->Run()) {
+          case sTune::TunerStatus::sample:  // once per sample during test
+	    _input = kiln_thermo->getFilteredTemperature_C(); // already done above
+	    break;
+	  case sTune::TunerStatus::tunings: // done when the tuning is complete
+	    _tuning.tuner->GetAutoTunings(&_Kp, &_Ki, &_Kd);
+	    _pid->SetMode(QuickPID::Control::automatic);
+	    _pid->SetProportionalMode(QuickPID::pMode::pOnMeas);
+	    _pid->SetAntiWindupMode(QuickPID::iAwMode::iAwClamp);
+	    _pid->SetTunings(_Kp, _Ki, _Kd);
+	    break;
+	  case sTune::TunerStatus::runPid: // once per sample after tuning
+	    _pid->Compute();
+	    break;
+	}
+      }
+      // compute will update _output
+      // check to make sure we haven't lost numerical stability
+      if (isnan(_output)) {
          qtklog.warn("nan detected for output of PID, disabling pid");
-         disable();
+	 if (_tuning.enabled)
+	   stopTuning();
+         if (isEnabled())
+	   disable();
 	 qtklog.warn("trying to shutdown any running program from pwm loop");
 	 if (program.isRunning()) {
 	   program.stop();
 	 }
       }
-      _output_ms = tmp;
+      // can't be lower than 0; this should really be min of update_ms
+      // update the internal state variable version
+      if (_output < 0) {
+	_output_ms = 0;
+	_output = 0;
+      } else
+	_output_ms = _output + 0.5; // rounding via 0.5
+      // decide if we should be turning on the ssr
       if (now - _windowStartTime < _output_ms)
         ssr_on();
       else
@@ -157,4 +219,35 @@ void QTKilnPWM::setUpdateInterval_ms(uint16_t updateInterval_ms) {
 
 uint16_t QTKilnPWM::getUpdateInterval_ms(void) {
   return _updateInterval_ms;
+}
+
+void QTKilnPWM::startTuning(void) {
+  if (!_pid) {
+    qtklog.warn("PID tuner invoked with no PID controller available");
+    return;
+  }
+  // create a new tuner
+  if (!_tuning.tuner)
+    _tuning.tuner = new sTune(&_input, &_output, sTune::TuningMethod::ZN_PID, 
+                        sTune::Action::directIP, sTune::SerialMode::printOFF);
+#if 0
+  // per the sTune instructions
+  _pid->SetMode(QuickPID::Control::manual); // but I don't see this in the example
+#endif
+  _tuning.outputSpan = _windowSize_ms;
+  _tuning.tuner->Configure(_tuning.inputSpan, _tuning.outputSpan, 
+                           _tuning.outputStart, _tuning.outputStep,
+		           _tuning.testTimeSec, _tuning.settleTimeSec,
+		           _tuning.samples);
+  _tuning.tuner->SetEmergencyStop(_tuning.tempLimit);
+
+  _tuning.enabled = true;
+}
+
+void QTKilnPWM::stopTuning(void) {
+  _tuning.enabled = false;
+}
+
+bool QTKilnPWM::isTuning(void) {
+  return _tuning.enabled;
 }

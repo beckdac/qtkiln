@@ -1,13 +1,15 @@
 #ifndef QTKILN_PWM_H
 #define QTKILN_PWM_H
 
-#include "Arduino.h"
-#include "PID_v2.h"
+#include <Arduino.h>
+#include <QuickPID.h>
+#include <sTune.h>
 
-#define QTKILN_PWM_TASK_STACK_SIZE 4096
+#define QTKILN_PWM_TASK_STACK_SIZE 8192
 #define QTKILN_PWM_TASK_PRI tskIDLE_PRIORITY + 3
 
 #define QTKILN_PWM_DEFAULT_WINDOW_SIZE 5000
+
 
 extern "C" void pwmTaskFunction(void *pvParameter);
 
@@ -41,6 +43,10 @@ class QTKilnPWM
     void setTunings(double Kp, double Ki, double Kd);
     void setUpdateInterval_ms(uint16_t updateInterval_ms);
     uint16_t getUpdateInterval_ms(void);
+    void resetPID(void);
+    void startTuning(void);
+    void stopTuning(void);
+    bool isTuning(void);
 
   private:
     uint16_t _updateInterval_ms = 20;	// how often the pid manager will run
@@ -50,8 +56,25 @@ class QTKilnPWM
     unsigned long _lastTime = 0;	// the last time the system was updated
     bool _enabled = false;		// is the system running
     uint16_t _output_ms = 0;		// where in the frequency window the high state should turn off
-    PID_v2 *_pid;			// PID control object
+    QuickPID *_pid;			// PID control object
     uint16_t _targetTemperature_C = 0;	// target temperature for PID
+    float _Kp, _Ki, _Kd;		// internal variables for linking tuner to PID controller
+    float _input, _output, _setpoint_flt_C;
+                                        // internal variables for PID control
+    struct QTKilnPWM_tuning {
+      bool enabled = false;             // are we in auto tune mode
+      sTune *tuner;			// PID tuner
+      // sTune settings
+      uint32_t settleTimeSec = 120; // 5s/sample
+      uint16_t samples = 500;
+      uint32_t testTimeSec = 500*5;  // runPid interval = testTimeSec / samples
+      float inputSpan = 1100;
+      float outputSpan = QTKILN_PWM_DEFAULT_WINDOW_SIZE;
+      float outputStart = 0;
+      float outputStep = 50;
+      float tempLimit = 450;
+      // 
+    } _tuning;
     TaskHandle_t _taskHandle = NULL;	// for managing the task later
 };
 

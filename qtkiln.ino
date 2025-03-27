@@ -443,14 +443,16 @@ void alarm_off(void) {
 void ssr_on(void) {
   if (ssr_state)
     return;
-  //alarm_on();
+  if (config.alarmOnSSR)
+    alarm_on();
   ssr_state = true;
   digitalWrite(SSR_PIN, LOW);
 }
 
 void ssr_off(void) {
   if (ssr_state) {
-    //alarm_off();
+    if (config.alarmOnSSR)
+      alarm_off();
     ssr_state = false;
     digitalWrite(SSR_PIN, HIGH);
   }
@@ -736,6 +738,8 @@ void onSetStateMessageReceived(const String &message) {
         alarm_on();
       else
         alarm_off();
+    } else if (strcmp(kv.key().c_str(), "alarmOnSSR") == 0) {
+      bool config.alarmOnSSR = doc["alarmOnSSR"] | false;
     } else if (strcmp(kv.key().c_str(), "restart") == 0) {
       bool restart = doc["restart"] | false;
       qtklog.warn("received restart request");

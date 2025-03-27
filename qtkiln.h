@@ -56,6 +56,7 @@ struct Config {
     uint16_t updateInterval_ms = 250;
     float filterCutoffFrequency_Hz = 1.;
   } kiln, housing;
+  bool alarmOnSSR = false;			// should the alarm sound when the SSR is on, mostly for testing
   struct HomeAssistantConfig {
     bool enabled = true;
     char configTopicFmt[MAX_CFG_STR] = "homeassistant/%s/%s_%s/config";
