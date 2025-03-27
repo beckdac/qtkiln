@@ -57,10 +57,11 @@ void QTKilnProgram::thread(void) {
 
   while (1) {
     if (_running) {
+      qtklog.debug(0, "running program %s at step %d", _currentProgram->name, _currentStep);
       // check to make sure that the data structures are reasonable intact
       // before doing anything
       if (!_currentProgram) {
-	qtklog.warn("program main thread called ifter program ended");
+	qtklog.warn("program main thread called after program ended");
 	_resetProgramVariables();
       } else if (_currentStep >= _currentProgram->steps) {
 	qtklog.warn("program main thread called after program ended");
@@ -319,8 +320,13 @@ void QTKilnProgram::start(void) {
     qtklog.print("starting program execution");
     _running = true;
     _currentStep = 0;
+    _resetProgramVariables();
     _resetProgramStepVariables();
     _stepStartTemp_C = kiln_thermo->getFilteredTemperature_C();
+    _nextStepChangeTime_ms = millis() + 
+	          _currentProgram->step[_currentStep].transitionWindow_ms + 
+		  _currentProgram->step[_currentStep].dwell_ms;
+    pwm.enable();
   }
 }
 

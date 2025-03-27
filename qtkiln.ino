@@ -182,7 +182,7 @@ void setup() {
   // no matter what this is the firs thing we do
   pinMode(SSR_PIN, OUTPUT);
   // always turn it off incase we are coming back from a reset
-  ssr_state=true;
+  ssr_state=true; // setting this to true causes it to be forced off
   ssr_off();
   // always turn it off incase we are coming back from a reset
   pinMode(ALARM_PIN, OUTPUT);
@@ -443,14 +443,14 @@ void alarm_off(void) {
 void ssr_on(void) {
   if (ssr_state)
     return;
-  alarm_on();
+  //alarm_on();
   ssr_state = true;
   digitalWrite(SSR_PIN, LOW);
 }
 
 void ssr_off(void) {
   if (ssr_state) {
-    alarm_off();
+    //alarm_off();
     ssr_state = false;
     digitalWrite(SSR_PIN, HIGH);
   }
@@ -739,10 +739,10 @@ void onSetStateMessageReceived(const String &message) {
     } else if (strcmp(kv.key().c_str(), "program") == 0) {
       const char *name = doc["program"];
       program.loadProgram(name);
-    } else if (strcmp(kv.key().c_str(), "run_program") == 0) {
-      bool state = doc["run_program"] | false;
+    } else if (strcmp(kv.key().c_str(), "runProgram") == 0) {
+      bool state = doc["runProgram"] | false;
       if (state && !program.isProgramLoaded()) {
-        qtklog.warn("run_program sent but no program loaded");
+        qtklog.warn("runProgram sent but no program loaded");
       } else if (state && !program.isRunning()) {
         qtklog.debug(QTKLOG_DBG_PRIO_ALWAYS, "starting to run program %s", program.getLoadedProgramName());
         program.start();
