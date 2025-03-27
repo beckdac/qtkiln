@@ -27,7 +27,7 @@ void config_setThermoFilterCutoffFrequency_Hz(QTKilnThermo *thermo, float cutoff
 QTKilnLog qtklog(true);
 
 // alarm pin
-#define ALARM_PIN 25
+#define ALARM_PIN 26
 bool alarm_state = false;
 
 // thermocouple phy
@@ -46,7 +46,7 @@ EspMQTTClient *mqttCli = NULL;
 QTKilnMQTT mqtt;
 
 // PWM object
-#define SSR_PIN 26
+#define SSR_PIN 25
 bool ssr_state = false;
 QTKilnPWM pwm(QTKILN_PWM_DEFAULT_WINDOW_SIZE);
 
@@ -256,7 +256,7 @@ void setup() {
   if (config.homeAss.enabled) {
     qtklog.debug(QTKLOG_DBG_PRIO_ALWAYS, "enabling last will for HomeAssistant entity management");
     snprintf(buf1, MAX_BUF, config.homeAss.configTopicFmt, "sensor", "qtkiln", config.mac);
-    mqttCli->enableLastWillMessage(buf1, "{}");
+    mqttCli->enableLastWillMessage(strdup(buf1), "{}");
   }
   mqttCli->enableDebuggingMessages(config.mqttEnableDebugMessages);
   mqttCli->enableOTA(config.topic);  // make hacking a little challenging
@@ -740,12 +740,12 @@ void onSetStateMessageReceived(const String &message) {
       const char *name = doc["program"];
       program.loadProgram(name);
     } else if (strcmp(kv.key().c_str(), "run_program") == 0) {
-      const char *state = doc["run_program"] | false;
+      bool state = doc["run_program"] | false;
       if (state && !program.isProgramLoaded()) {
         qtklog.warn("run_program sent but no program loaded");
       } else if (state && !program.isRunning()) {
         qtklog.debug(QTKLOG_DBG_PRIO_ALWAYS, "starting to run program %s", program.getLoadedProgramName());
-        program.run();
+        program.start();
       } else if (!state && program.isRunning()) {
         qtklog.debug(QTKLOG_DBG_PRIO_ALWAYS, "stopping program %s", program.getLoadedProgramName());
         program.stop();

@@ -139,7 +139,7 @@ void QTKilnProgram::thread(void) {
 	  float dTms = deltaTemp_C / _currentProgram->step[_currentStep].transitionWindow_ms;
 	  // new temperature from y = mx+b
 	  float newT_C = _stepStartTemp_C + (dTms * deltaT_ms);
-	  qtklog.debug(QTKLOG_DBG_PRIO_ALWAYS, "running program %s changing set point to %g", _currentProgram->name, newT_C);
+	  qtklog.debug(QTKLOG_DBG_PRIO_LOW, "running program %s changing set point to %g", _currentProgram->name, newT_C);
 	  pwm.setTargetTemperature_C(newT_C);
 	} else {
 	  // redundant
