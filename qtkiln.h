@@ -25,7 +25,7 @@ void ssr_off(void);
 #define MAX_BUF 256
 
 // default initial PID params
-#define PID_KP 10.0
+#define PID_KP 20.0
 #define PID_KI 0.2
 #define PID_KD 0.1
 

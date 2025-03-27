@@ -129,6 +129,7 @@ void QTKilnProgram::thread(void) {
 	    }
 	  }
 	}
+	qtklog.debug(0, "got here");
 	if (!_inDwell) {
 	  // update the temperature for this step
 	  unsigned long now = millis();

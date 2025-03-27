@@ -736,6 +736,11 @@ void onSetStateMessageReceived(const String &message) {
         alarm_on();
       else
         alarm_off();
+    } else if (strcmp(kv.key().c_str(), "restart") == 0) {
+      bool restart = doc["restart"] | false;
+      qtklog.warn("received restart request");
+      if (restart) // and we're out
+        esp_restart();
     } else if (strcmp(kv.key().c_str(), "program") == 0) {
       const char *name = doc["program"];
       program.loadProgram(name);
