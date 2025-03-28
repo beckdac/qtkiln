@@ -740,8 +740,10 @@ void onSetStateMessageReceived(const String &message) {
     qtklog.print("changing state of pwm to %s", (doc[MSG_PWM_ENABLE] ? "enabled" : "disabled"));
     if (enable && !pwmEnabled)
       pwm.enablePwm();
-    else if (!enable && pwmEnabled)
+    else if (!enable && pwmEnabled) {
       pwm.disable();
+      ignoreEnable = true;
+    }
   }
   // if this request turns on the pid enable, then
   // do it first before parsing others, like target temp
@@ -805,14 +807,76 @@ void onSetStateMessageReceived(const String &message) {
     config.alarmOnSSR = doc[MSG_ALARM_ON_SSR];
     qtklog.print("setting alarmOnSSR flag to %s", (config.alarmOnSSR ? "true" : "false"));
   }
+
+  bool tuningParamUpdate = false;
+#define MSG_PID_TUNING_SETTLE_TIME_S "settleTime_s"
+  if (doc[MSG_PID_TUNING_SETTLE_TIME_S].is<uint32_t>()) {
+    uint32_t val = doc[MSG_PID_TUNING_SETTLE_TIME_S];
+    qtklog.print("setting PID tuning parameter %s to %d", MSG_PID_TUNING_SETTLE_TIME_S, val);
+    pwm.setTuningSettleTime_s(val);
+    tuningParamUpdate = true;
+  }
+#define MSG_PID_TUNING_SAMPLES "samples"
+  if (doc[MSG_PID_TUNING_SAMPLES].is<uint16_t>()) {
+    uint16_t val = doc[MSG_PID_TUNING_SAMPLES];
+    qtklog.print("setting PID tuning parameter %s to %d", MSG_PID_TUNING_SAMPLES, val);
+    pwm.setTuningSamples(val);
+    tuningParamUpdate = true;
+  }
+#define MSG_PID_TUNING_TEST_TIME_S "testTime_s"
+  if (doc[MSG_PID_TUNING_TEST_TIME_S].is<uint32_t>()) {
+    uint32_t val = doc[MSG_PID_TUNING_TEST_TIME_S];
+    qtklog.print("setting PID tuning parameter %s to %d", MSG_PID_TUNING_TEST_TIME_S, val);
+    pwm.setTuningTestTime_s(val);
+    tuningParamUpdate = true;
+  }
+#define MSG_PID_TUNING_INPUT_SPAN "inputSpan"
+  if (doc[MSG_PID_TUNING_INPUT_SPAN].is<float>()) {
+    float val = doc[MSG_PID_TUNING_INPUT_SPAN];
+    qtklog.print("setting PID tuning parameter %s to %g", MSG_PID_TUNING_INPUT_SPAN, val);
+    pwm.setTuningInputSpan(val);
+    tuningParamUpdate = true;
+  }
+#define MSG_PID_TUNING_OUTPUT_SPAN "outputSpan"
+  if (doc[MSG_PID_TUNING_OUTPUT_SPAN].is<float>()) {
+    float val = doc[MSG_PID_TUNING_OUTPUT_SPAN];
+    qtklog.print("setting PID tuning parameter %s to %g", MSG_PID_TUNING_OUTPUT_SPAN, val);
+    pwm.setTuningOutputSpan(val);
+    tuningParamUpdate = true;
+  }
+#define MSG_PID_TUNING_OUTPUT_START "outputStart"
+  if (doc[MSG_PID_TUNING_OUTPUT_START].is<float>()) {
+    float val = doc[MSG_PID_TUNING_OUTPUT_START];
+    qtklog.print("setting PID tuning parameter %s to %g", MSG_PID_TUNING_OUTPUT_START, val);
+    pwm.setTuningOutputStart(val);
+    tuningParamUpdate = true;
+  }
+#define MSG_PID_TUNING_OUTPUT_STEP "outputStep"
+  if (doc[MSG_PID_TUNING_OUTPUT_STEP].is<float>()) {
+    float val = doc[MSG_PID_TUNING_OUTPUT_STEP];
+    qtklog.print("setting PID tuning parameter %s to %g", MSG_PID_TUNING_OUTPUT_STEP, val);
+    pwm.setTuningOutputStep(val);
+    tuningParamUpdate = true;
+  }
+#define MSG_PID_TUNING_TEMP_LIMIT "tempLimit"
+  if (doc[MSG_PID_TUNING_TEMP_LIMIT].is<float>()) {
+    float val = doc[MSG_PID_TUNING_TEMP_LIMIT];
+    qtklog.print("setting PID tuning parameter %s to %g", MSG_PID_TUNING_TEMP_LIMIT, val);
+    pwm.setTuningTempLimit(val);
+    tuningParamUpdate = true;
+  }
+  // if tuning is already enabled show a warning
+  if (pwm.isTuning() && tuningParamUpdate)
+    qtklog.warn("tuning parameter changes will take effect on next start of a tuning cycle");
 #define MSG_PID_TUNING "pidTuning"
   if (doc[MSG_PID_TUNING].is<bool>()) {
     if (doc[MSG_PID_TUNING])
       pwm.startTuning();
     else
       pwm.stopTuning();
-    qtklog.print("setting PID tuning flag to %s", (pwm.isTuning() ? "true" : "false"));
+    qtklog.print("setting PID tuning enable flag to %s", (pwm.isTuning() ? "true" : "false"));
   }
+
 #define MSG_RESTART "restart"
   if (doc[MSG_RESTART].is<bool>()) {
     bool restart = doc[MSG_RESTART];

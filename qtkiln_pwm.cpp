@@ -305,7 +305,7 @@ void QTKilnPWM::startTuning(void) {
   _tuning.outputSpan = _windowSize_ms;
   _tuning.tuner->Configure(_tuning.inputSpan, _tuning.outputSpan, 
                            _tuning.outputStart, _tuning.outputStep,
-		           _tuning.testTimeSec, _tuning.settleTimeSec,
+		           _tuning.testTime_s, _tuning.settleTime_s,
 		           _tuning.samples);
   _tuning.tuner->SetEmergencyStop(_tuning.tempLimit);
 
@@ -322,4 +322,36 @@ void QTKilnPWM::stopTuning(void) {
 
 bool QTKilnPWM::isTuning(void) {
   return _tuning.enabled;
+}
+
+void QTKilnPWM::setTuningSettleTime_s(uint32_t settleTime_s) {
+  _tuning.settleTime_s = settleTime_s;
+}
+
+void QTKilnPWM::setTuningSamples(uint16_t samples) {
+  _tuning.samples = samples;
+}
+
+void QTKilnPWM::setTuningTestTime_s(uint32_t testTime_s) {
+  _tuning.testTime_s = testTime_s;
+}
+
+void QTKilnPWM::setTuningInputSpan(float inputSpan) {
+  _tuning.inputSpan = inputSpan;
+}
+
+void QTKilnPWM::setTuningOutputSpan(float outputSpan) {
+  _tuning.outputSpan = outputSpan;
+}
+
+void QTKilnPWM::setTuningOutputStart(float outputStart) {
+  _tuning.outputStart = outputStart;
+}
+
+void QTKilnPWM::setTuningOutputStep(float outputStep) {
+  _tuning.outputStep = outputStep;
+}
+
+void QTKilnPWM::setTuningTempLimit(float tempLimit) {
+  _tuning.tempLimit = tempLimit;
 }
