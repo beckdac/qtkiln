@@ -232,21 +232,21 @@ double QTKilnPWM::getTuningKp(void) {
   if (_tuning.tuner)
     return _tuning.tuner->GetKp();
   else
-    return 0;
+    return 0.;
 }
 
 double QTKilnPWM::getTuningKi(void) {
   if (_tuning.tuner)
     return _tuning.tuner->GetKi();
   else
-    return 0;
+    return 0.;
 }
 
 double QTKilnPWM::getTuningKd(void) {
   if (_tuning.tuner)
     return _tuning.tuner->GetKd();
   else
-    return 0;
+    return 0.;
 }
 
 void QTKilnPWM::startTuning(void) {
@@ -262,10 +262,8 @@ void QTKilnPWM::startTuning(void) {
   if (!_tuning.tuner)
     _tuning.tuner = new sTune(&_input, &_output, sTune::TuningMethod::ZN_PID, 
                         sTune::Action::directIP, sTune::SerialMode::printOFF);
-#if 1
   // per the sTune instructions
-  _pid->SetMode(QuickPID::Control::manual); // but I don't see this in the example
-#endif
+  _pid->SetMode(QuickPID::Control::manual);
   _tuning.outputSpan = _windowSize_ms;
   _tuning.tuner->Configure(_tuning.inputSpan, _tuning.outputSpan, 
                            _tuning.outputStart, _tuning.outputStep,
@@ -274,6 +272,8 @@ void QTKilnPWM::startTuning(void) {
   _tuning.tuner->SetEmergencyStop(_tuning.tempLimit);
 
   enable();
+  // enable turns the PID mode to automatic so we duplicate this here
+  _pid->SetMode(QuickPID::Control::manual);
   _tuning.enabled = true;
 }
 
