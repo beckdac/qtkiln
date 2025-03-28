@@ -47,6 +47,9 @@ class QTKilnPWM
     void startTuning(void);
     void stopTuning(void);
     bool isTuning(void);
+    double getTuningKp(void);
+    double getTuningKi(void);
+    double getTuningKd(void);
 
   private:
     uint16_t _updateInterval_ms = 20;	// how often the pid manager will run
@@ -65,7 +68,7 @@ class QTKilnPWM
       bool enabled = false;             // are we in auto tune mode
       sTune *tuner;			// PID tuner
       // sTune settings
-      uint32_t settleTimeSec = 120; // 5s/sample
+      uint32_t settleTimeSec = 200;	// 40 samples
       uint16_t samples = 500;
       uint32_t testTimeSec = 500*5;  // runPid interval = testTimeSec / samples
       float inputSpan = 1100;

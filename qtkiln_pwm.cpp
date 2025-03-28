@@ -228,6 +228,27 @@ uint16_t QTKilnPWM::getUpdateInterval_ms(void) {
   return _updateInterval_ms;
 }
 
+double QTKilnPWM::getTuningKp(void) {
+  if (_tuning.tuner)
+    return _tuning.tuner->GetKp();
+  else
+    return 0;
+}
+
+double QTKilnPWM::getTuningKi(void) {
+  if (_tuning.tuner)
+    return _tuning.tuner->GetKi();
+  else
+    return 0;
+}
+
+double QTKilnPWM::getTuningKd(void) {
+  if (_tuning.tuner)
+    return _tuning.tuner->GetKd();
+  else
+    return 0;
+}
+
 void QTKilnPWM::startTuning(void) {
   if (!_pid) {
     qtklog.warn("PID tuner invoked with no PID controller available");
@@ -241,7 +262,7 @@ void QTKilnPWM::startTuning(void) {
   if (!_tuning.tuner)
     _tuning.tuner = new sTune(&_input, &_output, sTune::TuningMethod::ZN_PID, 
                         sTune::Action::directIP, sTune::SerialMode::printOFF);
-#if 0
+#if 1
   // per the sTune instructions
   _pid->SetMode(QuickPID::Control::manual); // but I don't see this in the example
 #endif

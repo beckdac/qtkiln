@@ -740,11 +740,13 @@ void onSetStateMessageReceived(const String &message) {
         alarm_off();
     } else if (strcmp(kv.key().c_str(), "alarmOnSSR") == 0) {
       config.alarmOnSSR = doc["alarmOnSSR"] | false;
+      qtklog.print("setting alarmOnSSR flag to %s", (config.alarmOnSSR ? "true" : "false"));
     } else if (strcmp(kv.key().c_str(), "pidTuning") == 0) {
       if (doc["pidTuning"] | false)
         pwm.startTuning();
       else
         pwm.stopTuning();
+      qtklog.print("setting PID tuning flag to %s", (pwm.isTuning() ? "true" : "false"));
     } else if (strcmp(kv.key().c_str(), "restart") == 0) {
       bool restart = doc["restart"] | false;
       qtklog.warn("received restart request");
