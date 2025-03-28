@@ -472,20 +472,20 @@ void loop() {
     float kiln_temp_C = kiln_thermo->getFilteredTemperature_C();
     float housing_temp_C = housing_thermo->getFilteredTemperature_C();
     if (kiln_temp_C > EMERGENCY_SHUTDOWN_TEMP_C) {
-      qtklog.warn("SHUTDOWN! at %d ms the shutdown temperature of %d was surpassed %d", millis(), EMERGENCY_SHUTDOWN_TEMP_C, kiln_temp_C);
+      qtklog.warn("SHUTDOWN! at %d ms the shutdown temperature of %d was surpassed %g", millis(), EMERGENCY_SHUTDOWN_TEMP_C, kiln_temp_C);
       kiln_eshut_temp = true;
     } else if (kiln_temp_C > ALARM_TEMP_C) {
       if (!kiln_alarm_temp) {
-        qtklog.warn("ALARM! at %d ms the alarm temperature of %d was surpassed %d", millis(), ALARM_TEMP_C, kiln_temp_C)
+        qtklog.warn("ALARM! at %d ms the alarm temperature of %d was surpassed %g", millis(), ALARM_TEMP_C, kiln_temp_C);
         kiln_alarm_temp = true;
       }
     }
     if (housing_temp_C > EMERGENCY_HOUSING_SHUTDOWN_TEMP_C) {
-      qtklog.warn("SHUTDOWN! at %d ms the shutdown temperature of %d was surpassed %d", millis(), EMERGENCY_HOUSING_SHUTDOWN_TEMP_C, housing_temp_C);
+      qtklog.warn("SHUTDOWN! at %d ms the shutdown temperature of %d was surpassed %g", millis(), EMERGENCY_HOUSING_SHUTDOWN_TEMP_C, housing_temp_C);
       housing_eshut_temp = true;
     } else if (housing_temp_C > ALARM_HOUSING_TEMP_C) {
       if (!housing_alarm_temp) {
-        qtklog.warn("ALARM! at %d ms the alarm temperature of %d was surpassed %d", millis(), ALARM_HOUSING_TEMP_C, housing_temp_C)
+        qtklog.warn("ALARM! at %d ms the alarm temperature of %d was surpassed %g", millis(), ALARM_HOUSING_TEMP_C, housing_temp_C);
         housing_alarm_temp = true;
       }
     }
@@ -499,9 +499,6 @@ void loop() {
       qtklog.warn("ALARM! at %d ms from temperatures", millis());
       alarm_on();
     }
-      
-    if (housing_thermo->getFilteredTemperature_C() > HOUSING_ALARM_TEMP)
-      alarm_on();
 
     lcd_update(kiln_thermo->getFilteredTemperature_C(), ssr_state, ssr_state);
     // run handlers for subprocesses 
@@ -681,29 +678,31 @@ void config_setPidInitialKd(double Kd) {
 void config_setDebugPriority(uint16_t debugPriority) {
   qtklog.setDebugPriorityCutoff(debugPriority);
 }
-void config_setTimezone(const char *timeZone) {
+void config_setTimezone(const char *timezone) {
   time_t now;
   struct tm timeinfo;
   char buf[MAX_BUF];
 
-  if (!timeZone) {
-    qtklog.warn("empty timeZone passed to set time zone");
+  if (!timezone) {
+    qtklog.warn("empty timezone passed to set time zone");
     return;
   }
 
-  setenv("TZ", timeZone, 1);
+  strncpy(config.timezone, timezone, MAX_CFG_STR);
+  qtklog.print("setting timezone to %s", timezone);
+  setenv("TZ", timezone, 1);
   tzset();
 
-  qtklog.debug(QTKLOG_DBG_PRIO_ALWAYS, "setting the ntp server to pool.ntp.org");
-  configTime(0, 0, "pool.ntp.org");
+  qtklog.debug(QTKLOG_DBG_PRIO_ALWAYS, "setting the ntp server to %s", NTP_SERVER);
+  configTzTime(config.timezone, NTP_SERVER);
   if (!localtime_r(&now, &timeinfo)) {
-    qtklog.warn("unable to obtain time");
+    qtklog.warn("unable to obtain localtime");
   }
 
   // localtime triggers calls to ntp and other things
   localtime_r(&now, &timeinfo);
   strftime(buf, MAX_BUF, "%c", &timeinfo);
-  qtklog.debug(QTKLOG_DBG_PRIO_ALWAYS, "time zone set to %s where the current time is %s", timeZone, buf);
+  qtklog.debug(QTKLOG_DBG_PRIO_ALWAYS, "time zone set to %s where the current time is %s", timezone, buf);
 }
 
 
@@ -717,8 +716,8 @@ void onConfigMessageReceived(const String &message) {
 void onSetStateMessageReceived(const String &message) {
   JsonDocument doc;
   double Kp = pwm.getKp(), Ki = pwm.getKi(), Kd = pwm.getKd();
-  bool pidEnabledAtStart = pwm.isEnabled(), startPid = false;
-  bool updateTunings = false;
+  bool pidEnabledAtStart = pwm.isPidEnabled(), startPid = false;
+  bool updateTunings = false, ignoreEnable = false;
 
   DeserializationError error = deserializeJson(doc, message);
 
@@ -726,86 +725,121 @@ void onSetStateMessageReceived(const String &message) {
     qtklog.warn("unable to deserialize JSON: %s", error.c_str());
     return;
   }
+#define MSG_HEATING_DISABLE "heatingDisable"
+  if (doc[MSG_HEATING_DISABLE].is<bool>()) {
+    pwm.disable();
+    qtklog.print("disabling heating outputs including PWM and PID");
+    ignoreEnable = true;
+  }
+#define MSG_PWM_ENABLE "pwmEnabled"
+  if (doc[MSG_PWM_ENABLE].is<bool>()) {
+    bool enable = doc[MSG_PWM_ENABLE];
+    bool pwmEnabled = pwm.isPwmEnabled();
+    if (enable == pwmEnabled)
+      return;
+    qtklog.print("changing state of pwm to %s", (doc[MSG_PWM_ENABLE] ? "enabled" : "disabled"));
+    if (enable && !pwmEnabled)
+      pwm.enablePwm();
+    else if (!enable && pwmEnabled)
+      pwm.disable();
+  }
   // if this request turns on the pid enable, then
   // do it first before parsing others, like target temp
   // if it turns it off, make sure the ssr is off
-  if (doc[MSG_PID_ENABLED].is<bool>()) {
+  if (doc[MSG_PID_ENABLED].is<bool>() && !ignoreEnable) {
     bool pidEnabled = doc[MSG_PID_ENABLED];
     if (!pidEnabled && pidEnabledAtStart) {
-      pwm.disable();
+      pwm.disablePid();
       qtklog.print("stopping PID control");
     } else if (pidEnabled && !pidEnabledAtStart) {
       startPid = true;
     }
   }
-  // go through the keys and handle each
-  for (JsonPair kv : doc.as<JsonObject>()) {
-    if (strcmp(kv.key().c_str(), MSG_TARGET_TEMP) == 0) {
-      double tmp = doc[MSG_TARGET_TEMP];
-      if (tmp < TARGET_TEMP_MIN) {
-        tmp = TARGET_TEMP_MIN;
-      } else if (tmp > TARGET_TEMP_MAX) {
-        tmp = TARGET_TEMP_MAX;
-      }
-      pwm.setTargetTemperature_C(tmp);
-      if (pwm.isEnabled()) { // pid was already enabled, just updating the set point
-        qtklog.print("adjusting current PID target temperature to %d C", pwm.getTargetTemperature_C());
-      } else {
-        qtklog.print("setting PID target temperature to %d C", pwm.getTargetTemperature_C());
-      }
-    } else if (strcmp(kv.key().c_str(), PREFS_PID_KP) == 0 && pwm.isEnabled()) {
+#define MSG_OUTPUT_MS "output_ms"
+  if (doc[MSG_OUTPUT_MS].is<uint16_t>()) {
+    pwm.setOutput_ms(doc[MSG_OUTPUT_MS]);
+    qtklog.print("set output pulse length to %d ms which is a duty cycle of %g %", pwm.getOutput_ms(), pwm.getDutyCycle());
+  }
+  if (doc[MSG_TARGET_TEMP].is<uint16_t>()) {
+    double tmp = doc[MSG_TARGET_TEMP];
+    if (tmp < TARGET_TEMP_MIN_C) {
+      tmp = TARGET_TEMP_MIN_C;
+    } else if (tmp > TARGET_TEMP_MAX_C) {
+      tmp = TARGET_TEMP_MAX_C;
+    }
+    pwm.setTargetTemperature_C(tmp);
+    if (pwm.isPwmEnabled()) { // pid was already enabled, just updating the set point
+      qtklog.print("adjusting current PID target temperature to %d C", pwm.getTargetTemperature_C());
+    } else {
+      qtklog.print("setting PID target temperature to %d C", pwm.getTargetTemperature_C());
+    }
+  }
+  if (doc[PREFS_PID_KP].is<double>()) {
       Kp = doc[PREFS_PID_KP];
       if (Kp < 0)
         Kp = 0;
       updateTunings = true;
-    } else if (strcmp(kv.key().c_str(), PREFS_PID_KI) == 0 && pwm.isEnabled()) {
+  }
+  if (doc[PREFS_PID_KI].is<double>()) {
       Ki = doc[PREFS_PID_KI];
       if (Ki < 0)
         Ki = 0;
       updateTunings = true;
-    } else if (strcmp(kv.key().c_str(), PREFS_PID_KD) == 0 && pwm.isEnabled()) {
+  }
+  if (doc[PREFS_PID_KD].is<double>()) {
       Kd = doc[PREFS_PID_KD];
       if (Kd < 0)
         Kd = 0;
       updateTunings = true;
-    } else if (strcmp(kv.key().c_str(), "alarm") == 0) {
-      bool alarm_set = doc["alarm"] | false;
-      if (alarm_set)
-        alarm_on();
-      else
-        alarm_off();
-    } else if (strcmp(kv.key().c_str(), "alarmOnSSR") == 0) {
-      config.alarmOnSSR = doc["alarmOnSSR"] | false;
-      qtklog.print("setting alarmOnSSR flag to %s", (config.alarmOnSSR ? "true" : "false"));
-    } else if (strcmp(kv.key().c_str(), "pidTuning") == 0) {
-      if (doc["pidTuning"] | false)
-        pwm.startTuning();
-      else
-        pwm.stopTuning();
-      qtklog.print("setting PID tuning flag to %s", (pwm.isTuning() ? "true" : "false"));
-    } else if (strcmp(kv.key().c_str(), "restart") == 0) {
-      bool restart = doc["restart"] | false;
-      qtklog.warn("received restart request");
-      if (restart) // and we're out
-        esp_restart();
-    } else if (strcmp(kv.key().c_str(), "program") == 0) {
-      const char *name = doc["program"];
-      program.loadProgram(name);
-    } else if (strcmp(kv.key().c_str(), "runProgram") == 0) {
-      bool state = doc["runProgram"] | false;
-      if (state && !program.isProgramLoaded()) {
-        qtklog.warn("runProgram sent but no program loaded");
-      } else if (state && !program.isRunning()) {
-        qtklog.debug(QTKLOG_DBG_PRIO_ALWAYS, "starting to run program %s", program.getLoadedProgramName());
-        program.start();
-      } else if (!state && program.isRunning()) {
-        qtklog.debug(QTKLOG_DBG_PRIO_ALWAYS, "stopping program %s", program.getLoadedProgramName());
-        program.stop();
-      }
+  }
+#define MSG_ALARM "alarm"
+  if (doc[MSG_ALARM].is<bool>()) {
+    bool alarm_set = doc[MSG_ALARM];
+    if (alarm_set)
+      alarm_on();
+    else
+      alarm_off();
+  }
+#define MSG_ALARM_ON_SSR "alarmOnSSR"
+  if (doc[MSG_ALARM_ON_SSR].is<bool>()) {
+    config.alarmOnSSR = doc[MSG_ALARM_ON_SSR];
+    qtklog.print("setting alarmOnSSR flag to %s", (config.alarmOnSSR ? "true" : "false"));
+  }
+#define MSG_PID_TUNING "pidTuning"
+  if (doc[MSG_PID_TUNING].is<bool>()) {
+    if (doc[MSG_PID_TUNING])
+      pwm.startTuning();
+    else
+      pwm.stopTuning();
+    qtklog.print("setting PID tuning flag to %s", (pwm.isTuning() ? "true" : "false"));
+  }
+#define MSG_RESTART "restart"
+  if (doc[MSG_RESTART].is<bool>()) {
+    bool restart = doc[MSG_RESTART];
+    qtklog.warn("received restart request");
+    if (restart) // and we're out
+      esp_restart();
+  }
+#define MSG_PROGRAM "program"
+  if (doc[MSG_PROGRAM].is<const char *>()) {
+    const char *name = doc[MSG_PROGRAM];
+    program.loadProgram(name);
+  }
+#define MSG_RUN_PROGRAM "runProgram"
+  if (doc[MSG_RUN_PROGRAM].is<bool>()) {
+    bool state = doc[MSG_RUN_PROGRAM];
+    if (state && !program.isProgramLoaded()) {
+      qtklog.warn("runProgram sent but no program loaded");
+    } else if (state && !program.isRunning()) {
+      qtklog.debug(QTKLOG_DBG_PRIO_ALWAYS, "starting to run program %s", program.getLoadedProgramName());
+      program.start();
+    } else if (!state && program.isRunning()) {
+      qtklog.debug(QTKLOG_DBG_PRIO_ALWAYS, "stopping program %s", program.getLoadedProgramName());
+      program.stop();
     }
   }
-  if (startPid) {
-      pwm.enable();
+  if (startPid && !ignoreEnable) {
+      pwm.enablePid();
       qtklog.print("starting PID with target temperature of %d C", pwm.getTargetTemperature_C());
   }
   if (updateTunings) {

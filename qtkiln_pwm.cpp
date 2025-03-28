@@ -150,7 +150,16 @@ float QTKilnPWM::getDutyCycle(void) {
 }
 
 void QTKilnPWM::setDutyCycle(float dutyCycle) {
-  _output_ms = (uint16_t)(dutyCycle / 100.) * (float)_windowSize_ms;
+  setOutput_ms((uint16_t)(dutyCycle / 100.) * (float)_windowSize_ms);
+}
+
+void QTKilnPWM::setOutput_ms(uint16_t output_ms) {
+  if (output_ms > _windowSize_ms) {
+    qtklog.warn("invalid output pulse length of %d ms specified, longer than max pulse window of %d ms", output_ms, _windowSize_ms);
+    return;
+  }
+  _output_ms = output_ms;
+  _output = _output_ms;
 }
 
 uint16_t QTKilnPWM::getOutput_ms(void) {
@@ -180,7 +189,7 @@ void QTKilnPWM::thread(void) {
             break;
           case sTune::TunerStatus::tunings: // done when the tuning is complete
             _tuning.tuner->GetAutoTunings(&_Kp, &_Ki, &_Kd);
-            qtklog.print("PID auto tuning complete and Kp = %g, Ki = %g, Kd = %d", _Kp, _Ki, _Kd);
+            qtklog.print("PID auto tuning complete and Kp = %g, Ki = %g, Kd = %g", _Kp, _Ki, _Kd);
             _pid->Reset();
             qtklog.print("updating configuration with initial tunings, consider saving");
             config_setPidInitialKp(_Kp);

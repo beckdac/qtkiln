@@ -4,6 +4,8 @@
 #include "wifi_cred.h"
 #include "mqtt_cred.h"
 
+#define NTP_SERVER "pool.ntp.org"
+
 // prototypes
 void config_setPwmWindow_ms(uint16_t pwm_update_int_ms);
 void config_setMqttUpdateInterval_ms(uint16_t mqtt_update_int_ms);
@@ -44,7 +46,7 @@ struct Config {
   char hostname[MAX_CFG_STR] = HOSTNAME_DEFAULT;
   char mac[MAX_CFG_STR] = MAC_DEFAULT;
   char topic[MAX_CFG_STR] = "";
-  char timezone[MAX_CFG_STR] = "GMT-8";
+  char timezone[MAX_CFG_STR] = "PST8PDT,M3.2.0,M11.1.0";  // https://github.com/nayarsystems/posix_tz_db/blob/master/zones.csv
   uint16_t debugPriority = 0;
   uint16_t pwmWindow_ms = 5000;
   uint16_t mqttUpdateInterval_ms = 1000;
