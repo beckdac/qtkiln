@@ -104,9 +104,9 @@ void QTKilnMQTT::_publish_state(bool active, bool pid_current) {
       Kp = pwm.getTuningKp();
       Ki = pwm.getTuningKi();
       Kd = pwm.getTuningKd();
-      doc["pid"]["tuning_Kp"] = Kp;
-      doc["pid"]["tuning_Ki"] = Ki;
-      doc["pid"]["tuning_Kd"] = Kd;
+      doc["pid"]["tuning"]["Kp"] = Kp;
+      doc["pid"]["tuning"]["Ki"] = Ki;
+      doc["pid"]["tuning"]["Kd"] = Kd;
     }
   }
   serializeJson(doc, jsonString);
