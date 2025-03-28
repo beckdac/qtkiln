@@ -101,12 +101,12 @@ void QTKilnMQTT::_publish_state(bool active, bool pid_current) {
     doc["pid"]["Ki"] = Ki;
     doc["pid"]["Kd"] = Kd;
     if (pwm.isTuning()) {
-      Kp = pwm.getTuningKp();
-      Ki = pwm.getTuningKi();
-      Kd = pwm.getTuningKd();
-      doc["pid"]["tuning"]["Kp"] = Kp;
-      doc["pid"]["tuning"]["Ki"] = Ki;
-      doc["pid"]["tuning"]["Kd"] = Kd;
+      double tKp = pwm.getTuningKp();
+      double tKi = pwm.getTuningKi();
+      double tKd = pwm.getTuningKd();
+      doc["pid"]["tuning"]["Kp"] = tKp;
+      doc["pid"]["tuning"]["Ki"] = tKi;
+      doc["pid"]["tuning"]["Kd"] = tKd;
     }
   }
   serializeJson(doc, jsonString);
