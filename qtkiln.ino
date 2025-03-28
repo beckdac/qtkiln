@@ -898,7 +898,8 @@ void onSetStateMessageReceived(const String &message) {
     } else if (state && !program.isRunning()) {
       qtklog.debug(QTKLOG_DBG_PRIO_ALWAYS, "starting to run program %s", program.getLoadedProgramName());
       program.start();
-    } else if (!state && program.isRunning()) {
+    } else if (!state) {
+    // && program.isRunning()) {
       qtklog.debug(QTKLOG_DBG_PRIO_ALWAYS, "stopping program %s", program.getLoadedProgramName());
       program.stop();
     }

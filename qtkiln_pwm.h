@@ -51,6 +51,7 @@ class QTKilnPWM
     void setTunings(double Kp, double Ki, double Kd);
     void setUpdateInterval_ms(uint16_t updateInterval_ms);
     uint16_t getUpdateInterval_ms(void);
+    void setPidMode(QuickPID::Control mode);
     void pidReset(void);
     void startTuning(void);
     void stopTuning(void);

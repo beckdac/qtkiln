@@ -90,6 +90,11 @@ bool QTKilnPWM::isPwmEnabled(void) {
   return _pwmEnabled;
 }
 
+void QTKilnPWM::setPidMode(QuickPID::Control mode) {
+  if (_pid)
+    _pid->SetMode(mode);
+}
+
 // PID
 void QTKilnPWM::enablePid(bool resetTunings) {
   if (!_pid) {

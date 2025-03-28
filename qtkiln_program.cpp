@@ -56,99 +56,103 @@ void QTKilnProgram::thread(void) {
   unsigned int now;
 
   while (1) {
+    if (_currentProgram)
+      qtklog.debug(QTKLOG_DBG_PRIO_LOW, "thread called at %d with _running set to %d and program %s loaded", millis(), _running, _currentProgram->name);
     if (_running) {
-      qtklog.debug(0, "running program %s at step %d", _currentProgram->name, _currentStep);
+      qtklog.debug(QTKLOG_DBG_PRIO_LOW, "running program %s at step %d", _currentProgram->name, _currentStep);
       // check to make sure that the data structures are reasonable intact
       // before doing anything
       if (!_currentProgram) {
-	qtklog.warn("program main thread called after program ended");
-	_resetProgramVariables();
+	      qtklog.warn("program main thread called after program ended");
+	      _resetProgramVariables();
       } else if (_currentStep >= _currentProgram->steps) {
-	qtklog.warn("program main thread called after program ended");
-	_resetProgramVariables();
+	      qtklog.warn("program main thread called after program ended");
+	      _resetProgramVariables();
       }
       // running and not paused
       if (!_paused) {
-	now = millis();
-	float nowTemp = kiln_thermo->getFilteredTemperature_C();
-	// check if we need to move to the next step
-	// this can happen if we are at the next time start, or
-	// in fast as possible and at target temperature
-	bool metAFAPConditions = false;
-	// if we are in the dwell period there is no afap
-	if (_inDwell) {
-	  metAFAPConditions = false;
-	// if we are in AFAP
+        qtklog.debug(QTKLOG_DBG_PRIO_LOW, "not paused");
+	      now = millis();
+	      float nowTemp = kiln_thermo->getFilteredTemperature_C();
+	      // check if we need to move to the next step
+	      // this can happen if we are at the next time start, or
+	      // in fast as possible and at target temperature
+	      bool metAFAPConditions = false;
+	      // if we are in the dwell period there is no afap
+	      if (_inDwell) {
+	        metAFAPConditions = false;
+	        // if we are in AFAP
         } else if (_currentProgram->step[_currentStep].asFastAsPossible) {
-	  // and temperature is in up mode
-	  if (_currentAFAPUp)
-	    metAFAPConditions = nowTemp > _currentProgram->step[_currentStep].targetTemperature_C;
-	  else // down mode
-	    metAFAPConditions = nowTemp < _currentProgram->step[_currentStep].targetTemperature_C;
-	  // if we have met the temperature conditions and there is a dwell time set
-	  // transition to dwell mode
-	  if (metAFAPConditions && _currentProgram->step[_currentStep].dwell_ms > 0) {
-	     // this is when we need to move to the next step
-	     _nextStepChangeTime_ms = now + _currentProgram->step[_currentStep].dwell_ms;
-	     // make sure to signal we are in dwell mode so that AFAP is no longer relevant
-	     _inDwell = true;
-	     // AFAP is no longer applicable for this pass through the loop
-	     metAFAPConditions = false;
-	     // finalize the temperature setting at the set point
-	     pwm.setTargetTemperature_C(_currentProgram->step[_currentStep].targetTemperature_C);
-	  }
-	}
-	// ready for a step change?
-	if (now >= _nextStepChangeTime_ms || metAFAPConditions) {
+	        // and temperature is in up mode
+	        if (_currentAFAPUp)
+	          metAFAPConditions = nowTemp > _currentProgram->step[_currentStep].targetTemperature_C;
+	        else // down mode
+	          metAFAPConditions = nowTemp < _currentProgram->step[_currentStep].targetTemperature_C;
+	        // if we have met the temperature conditions and there is a dwell time set
+	        // transition to dwell mode
+	        if (metAFAPConditions && _currentProgram->step[_currentStep].dwell_ms > 0) {
+	          // this is when we need to move to the next step
+	          _nextStepChangeTime_ms = now + _currentProgram->step[_currentStep].dwell_ms;
+	          // make sure to signal we are in dwell mode so that AFAP is no longer relevant
+	          _inDwell = true;
+	          // AFAP is no longer applicable for this pass through the loop
+	          metAFAPConditions = false;
+	          // finalize the temperature setting at the set point
+	          pwm.setTargetTemperature_C(_currentProgram->step[_currentStep].targetTemperature_C);
+	        }
+	      }
+        qtklog.debug(QTKLOG_DBG_PRIO_LOW, "met afap? %d", metAFAPConditions);
+	      // ready for a step change?
+	      if (now >= _nextStepChangeTime_ms || metAFAPConditions) {
           qtklog.debug(QTKLOG_DBG_PRIO_ALWAYS, "changing step to %d", _currentStep + 1);
-	  // if we have reached the end of the program stop execution
-	  if (_currentStep + 1 >= _currentProgram->steps) {
+	        // if we have reached the end of the program stop execution
+	        if (_currentStep + 1 >= _currentProgram->steps) {
             qtklog.debug(QTKLOG_DBG_PRIO_ALWAYS, "end of program reached, calling stop");
-	    stop();
-	  } else {
-	    // increment the step counter
-	    _currentStep++;
-	    _resetProgramStepVariables(); // sets, for example: _stepStartTime_ms
-	    _stepStartTemp_C = kiln_thermo->getFilteredTemperature_C();
-	    // is the next time change in AFAP
+	          stop();
+	        } else {
+	          // increment the step counter
+	          _currentStep++;
+	          _resetProgramStepVariables(); // sets, for example: _stepStartTime_ms
+	          _stepStartTemp_C = kiln_thermo->getFilteredTemperature_C();
+	          // is the next time change in AFAP
             if (_currentProgram->step[_currentStep].asFastAsPossible) {
-	      _nextStepChangeTime_ms = ULONG_MAX; // end of time for this micro
-	      if (_currentProgram->step[_currentStep].targetTemperature_C >
-		    _currentProgram->step[_currentStep-1].targetTemperature_C)
-	        _currentAFAPUp = true;
+	            _nextStepChangeTime_ms = ULONG_MAX; // end of time for this micro
+	            if (_currentProgram->step[_currentStep].targetTemperature_C >
+		               _currentProgram->step[_currentStep-1].targetTemperature_C)
+	              _currentAFAPUp = true;
               else
-	        _currentAFAPUp = false;
-	      // set temperature
-	      pwm.setTargetTemperature_C(_currentProgram->step[_currentStep].targetTemperature_C);
+	              _currentAFAPUp = false;
+	            // set temperature
+	            pwm.setTargetTemperature_C(_currentProgram->step[_currentStep].targetTemperature_C);
             } else {
-	      // calculate the next update interval which is the transition time 
-	      // plus the dwell time
-	      _nextStepChangeTime_ms = now + 
-	          _currentProgram->step[_currentStep].transitionWindow_ms + 
-		  _currentProgram->step[_currentStep].dwell_ms;
-	    }
-	  }
-	}
-	qtklog.debug(0, "got here");
-	if (!_inDwell) {
-	  // update the temperature for this step
-	  unsigned long now = millis();
-	  // time since the step start
-	  unsigned long deltaT_ms = now - _stepStartTime_ms;
-	  // temperature change over the transition window for this step
-	  float deltaTemp_C = _currentProgram->step[_currentStep].targetTemperature_C - _stepStartTemp_C;
-	  // degree change in C per millisecond, not data type
-	  float dTms = deltaTemp_C / _currentProgram->step[_currentStep].transitionWindow_ms;
-	  // new temperature from y = mx+b
-	  float newT_C = _stepStartTemp_C + (dTms * deltaT_ms);
-	  qtklog.debug(QTKLOG_DBG_PRIO_LOW, "running program %s changing set point to %g", _currentProgram->name, newT_C);
-	  pwm.setTargetTemperature_C(newT_C);
-	} else {
-	  // redundant
-	  // pwm.setTargetTemperature_C(_currentProgram->step[_currentStep].targetTemperature_C);
-	}
+	            // calculate the next update interval which is the transition time 
+	            // plus the dwell time
+	            _nextStepChangeTime_ms = now + 
+	                 _currentProgram->step[_currentStep].transitionWindow_ms + 
+		          _currentProgram->step[_currentStep].dwell_ms;
+	          }
+	        }
+        }
+	      qtklog.debug(QTKLOG_DBG_PRIO_LOW, "got here, are we in dwell? %d", _inDwell);
+	      if (!_inDwell) {
+	        // update the temperature for this step
+	        unsigned long now = millis();
+	        // time since the step start
+	        unsigned long deltaT_ms = now - _stepStartTime_ms;
+	        // temperature change over the transition window for this step
+	        float deltaTemp_C = _currentProgram->step[_currentStep].targetTemperature_C - _stepStartTemp_C;
+	        // degree change in C per millisecond, not data type
+	        float dTms = deltaTemp_C / _currentProgram->step[_currentStep].transitionWindow_ms;
+	        // new temperature from y = mx+b
+	        float newT_C = _stepStartTemp_C + (dTms * deltaT_ms);
+	        qtklog.debug(QTKLOG_DBG_PRIO_LOW, "running program %s changing set point to %g", _currentProgram->name, newT_C);
+	        pwm.setTargetTemperature_C(newT_C);
+	      } else {
+	        // redundant
+	        pwm.setTargetTemperature_C(_currentProgram->step[_currentStep].targetTemperature_C);
+	      }
       }
-    }
+	  }
     xDelay = pdMS_TO_TICKS(_updateInterval_ms);
     vTaskDelay(xDelay);
   }
@@ -214,10 +218,10 @@ struct QTKilnProgramStruct *QTKilnProgram::_parseProgram(const String &program) 
       new_program->step[i].asFastAsPossible = doc["step"][i][PGM_AFAP] | false;
       // no transition window time and not AFAP, something is wrong
       if (!new_program->step[i].asFastAsPossible) {
-	qtklog.warn("couldn't find transition time or As Fast As Possible flag parsing step %d", i);
-	free(new_program->step);
-	free(new_program);
-	return NULL;
+	      qtklog.warn("couldn't find transition time or As Fast As Possible flag parsing step %d", i);
+	      free(new_program->step);
+	      free(new_program);
+	      return NULL;
       }
       new_program->step[i].transitionWindow_ms = 0;
     } else {
@@ -225,10 +229,10 @@ struct QTKilnProgramStruct *QTKilnProgram::_parseProgram(const String &program) 
       new_program->step[i].transitionWindow_ms *= 1000 * 60; // convert min to ms
       new_program->step[i].asFastAsPossible = doc["step"][i][PGM_AFAP] | false;
       if (new_program->step[i].asFastAsPossible) {
-	qtklog.warn("transition time window and as fast as possible can't both be specificed for step %d", i);
-	free(new_program->step);
-	free(new_program);
-	return NULL;
+	      qtklog.warn("transition time window and as fast as possible can't both be specificed for step %d", i);
+	      free(new_program->step);
+	      free(new_program);
+	      return NULL;
       }
     }
     new_program->step[i].dwell_ms = doc["step"][i][PGM_DWELL_MIN] | 0;
@@ -319,14 +323,14 @@ void QTKilnProgram::loadProgram(const char *name) {
 void QTKilnProgram::start(void) {
   if (!_running) {
     qtklog.print("starting program execution");
-    _running = true;
-    _currentStep = 0;
     _resetProgramVariables();
     _resetProgramStepVariables();
+    _running = true;
+    _currentStep = 0;
     _stepStartTemp_C = kiln_thermo->getFilteredTemperature_C();
     _nextStepChangeTime_ms = millis() + 
 	          _currentProgram->step[_currentStep].transitionWindow_ms + 
-		  _currentProgram->step[_currentStep].dwell_ms;
+		        _currentProgram->step[_currentStep].dwell_ms;
     pwm.enablePid(true);
   }
 }
@@ -354,6 +358,7 @@ void QTKilnProgram::pause(void) {
     qtklog.print("pausing program execution at step %d", _currentStep);
     _paused = true;
   }
+  pwm.setPidMode(QuickPID::Control::manual);
 }
 
 void QTKilnProgram::unPause(void) {
@@ -361,6 +366,7 @@ void QTKilnProgram::unPause(void) {
     qtklog.print("unpausing program execution at step %d", _currentStep);
     _paused = true;
   }
+  pwm.setPidMode(QuickPID::Control::automatic);
 }
 
 void QTKilnProgram::setUpdateInterval_ms(uint16_t updateInterval_ms) {
