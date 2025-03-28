@@ -45,6 +45,23 @@ mosquitto_pub -L mqtt://mqtt_user:mqtt_password@mqtt_host/qtkiln/ECDA3BC01AB4/se
 mosquitto_pub -L mqtt://mqtt_user:mqtt_password@mqtt_host/qtkiln/ECDA3BC01AB4/set -m '{"pidEnabled":false}'
 ```
 
+### PID tuning protocole
+* Get a high enough output so it can be recorded to a file and parsed out later
+```
+mosquitto_pub -L mqtt://mqtt_user:mqtt_password@mqtt_host/qtkiln/ECDA3BC01AB4/config -m '{"mqttUpdateInterval_ms":1000}'
+sleep 1
+* Find a duty cycle or output_ms that is small and low temp
+```
+mosquitto_pub -L mqtt://mqtt_user:mqtt_password@mqtt_host/qtkiln/ECDA3BC01AB4/set -m '{"setOutput_ms":150}'
+```
+* Let the system stablize at this temperature an use it for the values in `qtkiln_pwm.h` under `tuning`; this includes the startstep which should be the output_ms like 150 above the stepsize which is startstep + the size so 200 for a step size of 50
+* Make sure the time windows are long enough that the system has fully equilibrated to the 150 before the quiet time is over and the test begins and the entire transition can happen in the sample window specified
+```
+mosquitto_pub -L mqtt://mqtt_user:mqtt_password@mqtt_host/qtkiln/ECDA3BC01AB4/set -m '{"alarmOnSSR":true}'
+sleep 1
+mosquitto_pub -L mqtt://mqtt_user:mqtt_password@mqtt_host/qtkiln/ECDA3BC01AB4/set -m '{"pidTuning":true}'
+```
+
 ### Current dependency set:
 ```
   WiFi at version 3.1.3
