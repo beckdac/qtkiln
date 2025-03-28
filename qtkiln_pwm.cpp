@@ -91,7 +91,7 @@ bool QTKilnPWM::isPwmEnabled(void) {
 }
 
 // PID
-void QTKilnPWM::enablePid(void) {
+void QTKilnPWM::enablePid(bool resetTunings) {
   if (!_pid) {
     qtklog.warn("unable to enable empty pid object!");
     return;
@@ -104,6 +104,8 @@ void QTKilnPWM::enablePid(void) {
   _setpoint_flt_C = _targetTemperature_C;
   _pid->SetMode(QuickPID::Control::automatic);
   //_pid->SetProportionalMode(QuickPID::pMode::pOnMeas);
+  if (resetTunings)
+    setTunings(config.Kp, config.Ki, config.Kd);
   _pid->Initialize();
   _pidEnabled = true;
 }

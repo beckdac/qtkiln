@@ -327,7 +327,7 @@ void QTKilnProgram::start(void) {
     _nextStepChangeTime_ms = millis() + 
 	          _currentProgram->step[_currentStep].transitionWindow_ms + 
 		  _currentProgram->step[_currentStep].dwell_ms;
-    pwm.enablePid();
+    pwm.enablePid(true);
   }
 }
 

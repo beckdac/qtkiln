@@ -23,7 +23,7 @@ class QTKilnPWM
     void begin(void);
     unsigned long msSinceLastUpdate(void);
     void enablePwm(void);
-    void enablePid(void);
+    void enablePid(bool resetTunings);
     void disable(void);
     void disablePwm(void);
     void disablePid(void);

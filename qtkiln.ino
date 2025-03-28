@@ -750,6 +750,7 @@ void onSetStateMessageReceived(const String &message) {
   // if it turns it off, make sure the ssr is off
   if (doc[MSG_PID_ENABLED].is<bool>() && !ignoreEnable) {
     bool pidEnabled = doc[MSG_PID_ENABLED];
+    qtklog.warn("trying to stop pid %d and %d", pidEnabled, pidEnabledAtStart);
     if (!pidEnabled && pidEnabledAtStart) {
       pwm.disablePid();
       qtklog.print("stopping PID control");
@@ -903,7 +904,7 @@ void onSetStateMessageReceived(const String &message) {
     }
   }
   if (startPid && !ignoreEnable) {
-      pwm.enablePid();
+      pwm.enablePid(true);
       qtklog.print("starting PID with target temperature of %d C", pwm.getTargetTemperature_C());
   }
   if (updateTunings) {
