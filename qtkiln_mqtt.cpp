@@ -85,17 +85,20 @@ void QTKilnMQTT::_publish_state(bool active, bool pid_current) {
   JsonDocument doc;
   String jsonString;
 
-  doc["kiln"]["time_ms"] = kiln_thermo->getLastTime();
+  doc["time_ms"] = millis();
+  //doc["kiln"]["time_ms"] = kiln_thermo->getLastTime();
   doc["kiln"]["temp_C"] = kiln_thermo->getFilteredTemperature_C();
-  doc["housing"]["time_ms"] = housing_thermo->getLastTime();
+  //doc["housing"]["time_ms"] = housing_thermo->getLastTime();
   doc["housing"]["temp_C"] = housing_thermo->getFilteredTemperature_C();
-  if (pwm.isEnabled() || active) {
-    doc["pidEnabled"] = pwm.isEnabled();
-    doc["targetTemp_C"] = pwm.getTargetTemperature_C();
+  if (pwm.isPwmEnabled() || active) {
     doc["dutyCycle_%"] = pwm.getDutyCycle();
     doc["output_ms"] = pwm.getOutput_ms();
+    if (pwm.isPidEnabled() || active) {
+      doc["pid"]["enabled"] = pwm.isEnabled();
+      doc["pid"]["targetTemp_C"] = pwm.getTargetTemperature_C();
+    }
   }
-  if (pwm.isEnabled() || pid_current) {
+  if (pwm.isPidEnabled() || pid_current) {
     double Kp = pwm.getKp(), Ki = pwm.getKi(), Kd = pwm.getKd();
     doc["pid"]["Kp"] = Kp;
     doc["pid"]["Ki"] = Ki;

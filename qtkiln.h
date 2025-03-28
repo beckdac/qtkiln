@@ -74,8 +74,12 @@ struct Config {
 };
 
 // global temperature maxes
-#define TARGET_TEMP_MIN 0
-#define TARGET_TEMP_MAX 1100
+#define TARGET_TEMP_MIN_C 0
+#define TARGET_TEMP_MAX_C 1000
+#define ALARM_TEMP_C 900
+#define EMERGENCY_SHUTDOWN_TEMP_C 1100
+#define ALARM_HOUSING_TEMP_C 60
+#define EMERGENCY_HOUSING_SHUTDOWN_TEMP_C 80
 
 // MQTT keywords
 #define MQTT_TOPIC_FMT "%s/%s"

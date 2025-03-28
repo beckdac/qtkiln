@@ -461,12 +461,48 @@ void ssr_off(void) {
 // main loop, this is a freertos task
 void loop() {
   TickType_t xDelay;
+  bool kiln_alarm_temp = false, housing_alarm_temp = false;
+  bool kiln_eshut_temp = false, housing_eshut_temp = false;
 
 #define QTKILN_MAIN_LOOP_STARTUP_DELAY 1000
   xDelay = pdMS_TO_TICKS(QTKILN_MAIN_LOOP_STARTUP_DELAY);
   vTaskDelay(xDelay);
 
   while (1) {
+    float kiln_temp_C = kiln_thermo->getFilteredTemperature_C();
+    float housing_temp_C = housing_thermo->getFilteredTemperature_C();
+    if (kiln_temp_C > EMERGENCY_SHUTDOWN_TEMP_C) {
+      qtklog.warn("SHUTDOWN! at %d ms the shutdown temperature of %d was surpassed %d", millis(), EMERGENCY_SHUTDOWN_TEMP_C, kiln_temp_C);
+      kiln_eshut_temp = true;
+    } else if (kiln_temp_C > ALARM_TEMP_C) {
+      if (!kiln_alarm_temp) {
+        qtklog.warn("ALARM! at %d ms the alarm temperature of %d was surpassed %d", millis(), ALARM_TEMP_C, kiln_temp_C)
+        kiln_alarm_temp = true;
+      }
+    }
+    if (housing_temp_C > EMERGENCY_HOUSING_SHUTDOWN_TEMP_C) {
+      qtklog.warn("SHUTDOWN! at %d ms the shutdown temperature of %d was surpassed %d", millis(), EMERGENCY_HOUSING_SHUTDOWN_TEMP_C, housing_temp_C);
+      housing_eshut_temp = true;
+    } else if (housing_temp_C > ALARM_HOUSING_TEMP_C) {
+      if (!housing_alarm_temp) {
+        qtklog.warn("ALARM! at %d ms the alarm temperature of %d was surpassed %d", millis(), ALARM_HOUSING_TEMP_C, housing_temp_C)
+        housing_alarm_temp = true;
+      }
+    }
+    if (kiln_eshut_temp || housing_eshut_temp) {
+      qtklog.warn("SHUTDOWN! at %d ms of the ssr, pwm, program and turn on the alarm", millis());
+      alarm_on();
+      ssr_off();
+      pwm.disable();
+      program.stop();
+    } else if (kiln_alarm_temp || housing_alarm_temp) {
+      qtklog.warn("ALARM! at %d ms from temperatures", millis());
+      alarm_on();
+    }
+      
+    if (housing_thermo->getFilteredTemperature_C() > HOUSING_ALARM_TEMP)
+      alarm_on();
+
     lcd_update(kiln_thermo->getFilteredTemperature_C(), ssr_state, ssr_state);
     // run handlers for subprocesses 
     mqttCli->loop();

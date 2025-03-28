@@ -62,42 +62,69 @@ TaskHandle_t QTKilnPWM::getTask(void) {
   return _taskHandle;
 }
 
-void QTKilnPWM::enable(void) {
-  bool wasEnabled = _enabled;
-  _enabled = true;
+// PWM
+void QTKilnPWM::enablePwm(void) {
+  bool wasEnabled = _pwmEnabled;
+  _pwmEnabled = true;
   if (!wasEnabled) {
-    _input = kiln_thermo->getFilteredTemperature_C();
-    _setpoint_flt_C = _targetTemperature_C;
-    _pid->SetMode(QuickPID::Control::automatic);
-    //_pid->SetProportionalMode(QuickPID::pMode::pOnMeas);
-    _pid->Initialize();
-    //_pid->Compute();
     _windowStartTime = millis();
-    qtklog.debug(0, "PID is being enabled for the PWM task");
+    qtklog.debug(QTKLOG_DBG_PRIO_HIGH, "PWM is being enabled");
   }
 }
 
-void QTKilnPWM::resetPID(void) {
-  if (_enabled) {
+void QTKilnPWM::disable(void) {
+  disablePwm();
+}
+
+void QTKilnPWM::disablePwm(void) {
+  bool wasEnabled = _pwmEnabled;
+  _pwmEnabled = false;
+  disablePid();
+  if (wasEnabled) {
+    ssr_off();
+    qtklog.debug(QTKLOG_DBG_PRIO_HIGH, "PWM is being disabled");
+  }
+}
+
+bool QTKilnPWM::isPwmEnabled(void) {
+  return _pwmEnabled;
+}
+
+// PID
+void QTKilnPWM::enablePid(void) {
+  if (!_pid) {
+    qtklog.warn("unable to enable empty pid object!");
+    return;
+  }
+  // turn on the pwm engine
+  enablePwm();
+  qtklog.debug(QTKLOG_DBG_PRIO_HIGH, "PID is being enabled");
+  // setup the pid before letting it loose
+  _input = kiln_thermo->getFilteredTemperature_C();
+  _setpoint_flt_C = _targetTemperature_C;
+  _pid->SetMode(QuickPID::Control::automatic);
+  //_pid->SetProportionalMode(QuickPID::pMode::pOnMeas);
+  _pid->Initialize();
+  _pidEnabled = true;
+}
+
+void QTKilnPWM::disablePid(void) {
+  qtklog.debug(QTKLOG_DBG_PRIO_HIGH, "PID is being disabled");
+  _pid->SetMode(QuickPID::Control::manual);
+  _pidEnabled = false;
+}
+
+bool QTKilnPWM::isPidEnabled(void) {
+  return _pidEnabled;
+}
+
+void QTKilnPWM::pidReset(void) {
+  if (_pidEnabled) {
     qtklog.warn("cannot reset the PID parameters while control is enabled");
     return;
   }
   if (_pid)
     _pid->Reset();
-}
-
-void QTKilnPWM::disable(void) {
-  bool wasEnabled = _enabled;
-  _enabled = false;
-  if (wasEnabled) {
-    _pid->SetMode(QuickPID::Control::manual);
-    ssr_off();
-    qtklog.debug(0, "PID is being disabled for the PWM task");
-  }
-}
-
-bool QTKilnPWM::isEnabled(void) {
-  return _enabled;
 }
 
 uint16_t QTKilnPWM::getTargetTemperature_C() {
@@ -122,6 +149,10 @@ float QTKilnPWM::getDutyCycle(void) {
   return 100. * (float)_output_ms / (float)_windowSize_ms;
 }
 
+void QTKilnPWM::setDutyCycle(float dutyCycle) {
+  _output_ms = (uint16_t)(dutyCycle / 100.) * (float)_windowSize_ms;
+}
+
 uint16_t QTKilnPWM::getOutput_ms(void) {
   return _output_ms;
 }
@@ -131,61 +162,59 @@ void QTKilnPWM::thread(void) {
   unsigned long now;
 
   while (1) {
-    if (_enabled && _pid) {
-      if (kiln_thermo)
+    if (_pwmEnabled) {
+      if (kiln_thermo && _pidEnabled)
         _input = kiln_thermo->getFilteredTemperature_C();
-      else
-	qtklog.warn("kiln_thermo not available in the pwm main loop");
+      else if (!kiln_thermo)
+        qtklog.warn("kiln_thermo not available in the pwm main loop");
       now = millis();
       while (now - _windowStartTime > _windowSize_ms) {
         _windowStartTime += _windowSize_ms;
       }
-      if (!_tuning.enabled) {
-	_pid->Compute(); // most of these will be noop with false return
-      } else {
-	switch (_tuning.tuner->Run()) {
+      if (!_tuning.enabled && _pid && _pidEnabled) {
+        _pid->Compute(); // most of these will be noop with false return
+      } else if (_tuning.enabled && _pid && kiln_thermo) {
+        switch (_tuning.tuner->Run()) {
           case sTune::TunerStatus::sample:  // once per sample during test
-	    _input = kiln_thermo->getFilteredTemperature_C(); // already done above
-	    break;
-	  case sTune::TunerStatus::tunings: // done when the tuning is complete
-	    _tuning.tuner->GetAutoTunings(&_Kp, &_Ki, &_Kd);
-	    qtklog.print("PID auto tuning complete and Kp = %g, Ki = %g, Kd = %d", _Kp, _Ki, _Kd);
-	    _pid->Reset();
-	    qtklog.print("updating configuration with initial tunings, consider saving");
+            _input = kiln_thermo->getFilteredTemperature_C(); // already done above
+            break;
+          case sTune::TunerStatus::tunings: // done when the tuning is complete
+            _tuning.tuner->GetAutoTunings(&_Kp, &_Ki, &_Kd);
+            qtklog.print("PID auto tuning complete and Kp = %g, Ki = %g, Kd = %d", _Kp, _Ki, _Kd);
+            _pid->Reset();
+            qtklog.print("updating configuration with initial tunings, consider saving");
             config_setPidInitialKp(_Kp);
-	    config_setPidInitialKi(_Ki);
+            config_setPidInitialKi(_Ki);
             config_setPidInitialKd(_Kd);
-	    qtklog.print("returning control to PID with new tunings");
-	    _pid->SetMode(QuickPID::Control::automatic);
-	    _pid->SetProportionalMode(QuickPID::pMode::pOnMeas);
-	    _pid->SetAntiWindupMode(QuickPID::iAwMode::iAwClamp);
-	    _pid->SetTunings(_Kp, _Ki, _Kd);
-	    break;
-	  case sTune::TunerStatus::runPid: // once per sample after tuning
-	    _pid->Compute(); // most of these will be noop with false return
-	    break;
-	}
+            qtklog.print("returning control to PID with new tunings");
+            _pid->SetMode(QuickPID::Control::automatic);
+            _pid->SetProportionalMode(QuickPID::pMode::pOnMeas);
+            _pid->SetAntiWindupMode(QuickPID::iAwMode::iAwClamp);
+            _pid->SetTunings(_Kp, _Ki, _Kd);
+            break;
+          case sTune::TunerStatus::runPid: // once per sample after tuning
+            _pid->Compute(); // most of these will be noop with false return
+            break;
+        }
       }
       // compute will update _output
       // check to make sure we haven't lost numerical stability
       if (isnan(_output)) {
-         qtklog.warn("nan detected for output of PID, disabling pid");
-	 if (_tuning.enabled)
-	   stopTuning();
-         if (isEnabled())
-	   disable();
-	 qtklog.warn("trying to shutdown any running program from pwm loop");
-	 if (program.isRunning()) {
-	   program.stop();
-	 }
+        qtklog.warn("nan detected for output of PID, shutting everything off");
+        ssr_off();
+        disable();
+        qtklog.warn("trying to shutdown any running program from pwm loop");
+        if (program.isRunning()) {
+          program.stop();
+        } 
       }
       // can't be lower than 0; this should really be min of update_ms
       // update the internal state variable version
       if (_output < 0) {
-	_output_ms = 0;
-	_output = 0;
+	      _output_ms = 0;
+	      _output = 0;
       } else
-	_output_ms = _output + 0.5; // rounding via 0.5
+	      _output_ms = _output + 0.5; // rounding via 0.5
       // decide if we should be turning on the ssr
       if (now - _windowStartTime < _output_ms)
         ssr_on();
@@ -254,8 +283,8 @@ void QTKilnPWM::startTuning(void) {
     qtklog.warn("PID tuner invoked with no PID controller available");
     return;
   }
-  if (getTargetTemperature_C() == 0) {
-    qtklog.warn("current target temperature is 0, tuning not available");
+  if (getTargetTemperature_C() != 0) {
+    qtklog.warn("current target temperature is not 0, tuning not available");
     return;
   }
   // create a new tuner
@@ -271,7 +300,7 @@ void QTKilnPWM::startTuning(void) {
 		           _tuning.samples);
   _tuning.tuner->SetEmergencyStop(_tuning.tempLimit);
 
-  enable();
+  enablePwm();
   // enable turns the PID mode to automatic so we duplicate this here
   _pid->SetMode(QuickPID::Control::manual);
   _tuning.enabled = true;
