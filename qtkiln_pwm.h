@@ -68,12 +68,12 @@ class QTKilnPWM
       bool enabled = false;             // are we in auto tune mode
       sTune *tuner;			// PID tuner
       // sTune settings
-      uint32_t settleTimeSec = 200;	// 40 samples
+      uint32_t settleTimeSec = 10;	
       uint16_t samples = 500;
       uint32_t testTimeSec = 500*5;  // runPid interval = testTimeSec / samples
       float inputSpan = 1100;
       float outputSpan = QTKILN_PWM_DEFAULT_WINDOW_SIZE;
-      float outputStart = 0;
+      float outputStart = 250;
       float outputStep = 50;
       float tempLimit = 450;
       // 
