@@ -157,8 +157,11 @@ void QTKilnPWM::setDutyCycle(float dutyCycle) {
 
 void QTKilnPWM::setOutput_ms(uint16_t output_ms) {
   if (output_ms > _windowSize_ms) {
-    qtklog.warn("invalid output pulse length of %d ms specified, longer than max pulse window of %d ms", output_ms, _windowSize_ms);
+    qtklog.warn("invalid output pulse length of %d ms specified, longer than max pulse window of %d ms, ignoring change request", output_ms, _windowSize_ms);
     return;
+  } else if (output_ms < QTKILN_PWM_MINIMUM_PULSE_WIDTH_MS) {
+    qtklog.warn("minimum pulse length must be %d ms and %d ms was passed, setting to 0", QTKILN_PWM_MINIMUM_PULSE_WIDTH_MS, output_ms);
+    output_ms = 0;
   }
   _output_ms = output_ms;
   _output = _output_ms;
@@ -224,6 +227,12 @@ void QTKilnPWM::thread(void) {
       if (_output < 0) {
 	      _output_ms = 0;
 	      _output = 0;
+      } else if (_output < QTKILN_PWM_MINIMUM_PULSE_WIDTH_MS) {
+        _output_ms = 0;
+        _output = 0;
+      } else if (_output > _windowSize_ms) {
+        _output_ms = _windowSize_ms;
+        _output = _windowSize_ms;
       } else
 	      _output_ms = _output + 0.5; // rounding via 0.5
       // decide if we should be turning on the ssr

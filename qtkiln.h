@@ -27,9 +27,9 @@ void ssr_off(void);
 #define MAX_BUF 256
 
 // default initial PID params
-#define PID_KP 20.0
-#define PID_KI 0.2
-#define PID_KD 0.1
+#define PID_KP 8.0
+#define PID_KI 0.1
+#define PID_KD 0.05
 
 #define QTKILN_TASK_CORE 1
 // config structure used by all the modules

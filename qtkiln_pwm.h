@@ -9,6 +9,7 @@
 #define QTKILN_PWM_TASK_PRI tskIDLE_PRIORITY + 3
 
 #define QTKILN_PWM_DEFAULT_WINDOW_SIZE 5000
+#define QTKILN_PWM_MINIMUM_PULSE_WIDTH_MS 50
 
 #define QTKILN_EMERGENCY_TEMP_C 1000 // keeping this well below rating for now
 
