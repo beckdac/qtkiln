@@ -42,6 +42,7 @@ void QTKilnProgram::_resetProgramStepVariables(void) {
   _currentAFAPUp = true; // always start trying to increase the temperature
   _inDwell = false;
   _stepStartTime_ms = millis();
+  _stepStartTemp_C = kiln_thermo->getFilteredTemperature_C();
 }
 
 void QTKilnProgram::_resetProgramVariables(void) {
@@ -113,9 +114,9 @@ void QTKilnProgram::thread(void) {
 	          // increment the step counter
 	          _currentStep++;
 	          _resetProgramStepVariables(); // sets, for example: _stepStartTime_ms
-	          _stepStartTemp_C = kiln_thermo->getFilteredTemperature_C();
 	          // is the next time change in AFAP
             if (_currentProgram->step[_currentStep].asFastAsPossible) {
+              qtklog.debug(QTKLOG_DBG_PRIO_MED, "this step (%d) is in AFAP mode", _currentStep);
 	            _nextStepChangeTime_ms = ULONG_MAX; // end of time for this micro
 	            if (_currentProgram->step[_currentStep].targetTemperature_C >
 		               _currentProgram->step[_currentStep-1].targetTemperature_C)
@@ -130,6 +131,7 @@ void QTKilnProgram::thread(void) {
 	            _nextStepChangeTime_ms = now + 
 	                 _currentProgram->step[_currentStep].transitionWindow_ms + 
 		          _currentProgram->step[_currentStep].dwell_ms;
+              qtklog.debug(QTKLOG_DBG_PRIO_MED, "this step will end at %lu ms", _nextStepChangeTime_ms);
 	          }
 	        }
         }
@@ -140,6 +142,7 @@ void QTKilnProgram::thread(void) {
 	        // time since the step start
 	        unsigned long deltaT_ms = now - _stepStartTime_ms;
           if (deltaT_ms > _currentProgram->step[_currentStep].transitionWindow_ms) {
+            qtklog.debug(QTKLOG_DBG_PRIO_MED, "moving into dwell period for this step (%lu)", _nextStepChangeTime_ms);
             _inDwell = true;
           } else {
 	          // temperature change over the transition window for this step
@@ -154,6 +157,7 @@ void QTKilnProgram::thread(void) {
 	      }
         if (_inDwell) {
 	        pwm.setTargetTemperature_C(_currentProgram->step[_currentStep].targetTemperature_C);
+	        qtklog.debug(QTKLOG_DBG_PRIO_LOW, "setting dwell set point (again, probably) to %g", pwm.getTargetTemperature_C());
 	      }
       }
 	  }
