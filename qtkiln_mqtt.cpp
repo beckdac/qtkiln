@@ -3,6 +3,7 @@
 
 #include "qtkiln_mqtt.h"
 #include "qtkiln_thermo.h"
+#include "qtkiln_program.h"
 #include "qtkiln_pwm.h"
 #include "qtkiln_log.h"
 #include "qtkiln.h"
@@ -16,6 +17,7 @@ extern QTKilnThermo *kiln_thermo;
 extern QTKilnThermo *housing_thermo;
 
 extern QTKilnPWM pwm;
+extern QTKilnProgram program;
 
 // use a static function to be the entry point for the task
 void mqttTaskFunction(void *pvParameter) {
@@ -89,6 +91,7 @@ void QTKilnMQTT::_publish_state(bool active, bool pid_current) {
   doc["kiln"]["temp_C"] = kiln_thermo->getFilteredTemperature_C();
   doc["housing"]["temp_C"] = housing_thermo->getFilteredTemperature_C();
   if (pwm.isPwmEnabled() || active) {
+    doc["pwm"]["enabled"] = pwm.isPwmEnabled();
     doc["dutyCycle_%"] = pwm.getDutyCycle();
     doc["output_ms"] = pwm.getOutput_ms();
     if (pwm.isPidEnabled() || active) {
@@ -101,14 +104,21 @@ void QTKilnMQTT::_publish_state(bool active, bool pid_current) {
     doc["pid"]["Kp"] = Kp;
     doc["pid"]["Ki"] = Ki;
     doc["pid"]["Kd"] = Kd;
-    if (pwm.isTuning()) {
-      double tKp = pwm.getTuningKp();
-      double tKi = pwm.getTuningKi();
-      double tKd = pwm.getTuningKd();
-      doc["pid"]["tuning"]["Kp"] = tKp;
-      doc["pid"]["tuning"]["Ki"] = tKi;
-      doc["pid"]["tuning"]["Kd"] = tKd;
-    }
+  }
+  if (pwm.isTuning()) {
+    double tKp = pwm.getTuningKp();
+    double tKi = pwm.getTuningKi();
+    double tKd = pwm.getTuningKd();
+    doc["pid"]["tuning"]["Kp"] = tKp;
+    doc["pid"]["tuning"]["Ki"] = tKi;
+    doc["pid"]["tuning"]["Kd"] = tKd;
+  }
+  if (program.isProgramLoaded()) {
+    doc["program"]["name"] = program.getLoadedProgramName();
+    doc["program"]["running"] = program.isRunning();
+    doc["program"]["paused"] = program.isPaused();
+    doc["program"]["step"] = program.getCurrentStep();
+    doc["program"]["steps"] = program.getCurrentProgramSteps();
   }
   serializeJson(doc, jsonString);
   snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_STATE);

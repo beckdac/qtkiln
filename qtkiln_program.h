@@ -55,6 +55,8 @@ class QTKilnProgram
     uint16_t getUpdateInterval_ms(void);
     bool isProgramLoaded(void);
     const char *getLoadedProgramName(void);
+    uint8_t getCurrentStep(void);
+    uint8_t getCurrentProgramSteps(void);
 
   private:
     struct QTKilnProgramStruct *_parseProgram(const String &program);

@@ -172,7 +172,7 @@ UBaseType_t QTKilnProgram::getTaskHighWaterMark(void) {
 struct QTKilnProgramStruct *QTKilnProgram::_parseProgram(const String &program) {
   JsonDocument doc;
 
-  qtklog.debug(0, "parsing program from JSON: %s", program.c_str());
+  qtklog.debug(QTKLOG_DBG_PRIO_LOW, "parsing program from JSON: %s", program.c_str());
 
   DeserializationError error = deserializeJson(doc, program);
 
@@ -380,4 +380,14 @@ uint16_t QTKilnProgram::getUpdateInterval_ms(void) {
 
 bool QTKilnProgram::isRunning(void) {
   return _running;
+}
+
+uint8_t QTKilnProgram::getCurrentStep(void) {
+  return _currentStep;
+}
+
+uint8_t QTKilnProgram::getCurrentProgramSteps(void) {
+  if (_currentProgram)
+    return _currentProgram->steps;
+  return 0;
 }
