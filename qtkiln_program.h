@@ -57,6 +57,10 @@ class QTKilnProgram
     const char *getLoadedProgramName(void);
     uint8_t getCurrentStep(void);
     uint8_t getCurrentProgramSteps(void);
+    bool isDwell(void);
+    unsigned long getNextStepChangeTime_ms(void);
+    unsigned long getStepStartTime_ms(void);
+    uint16_t getStepStartTemp_C();
 
   private:
     struct QTKilnProgramStruct *_parseProgram(const String &program);

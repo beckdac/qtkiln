@@ -83,29 +83,29 @@ unsigned long QTKilnMQTT::getLastTime(void) {
   return _lastTime;
 }
 
-void QTKilnMQTT::_publish_state(bool active, bool pid_current) {
+void QTKilnMQTT::_publish_state(bool active, bool pid_current, bool deepState) {
   JsonDocument doc;
   String jsonString;
 
   doc["time_ms"] = millis();
   doc["kiln"]["temp_C"] = kiln_thermo->getFilteredTemperature_C();
   doc["housing"]["temp_C"] = housing_thermo->getFilteredTemperature_C();
-  if (pwm.isPwmEnabled() || active) {
+  if (pwm.isPwmEnabled() || active || deepState) {
     doc["pwm"]["enabled"] = pwm.isPwmEnabled();
-    doc["dutyCycle_%"] = pwm.getDutyCycle();
-    doc["output_ms"] = pwm.getOutput_ms();
-    if (pwm.isPidEnabled() || active) {
+    doc["pwm"]["dutyCycle_%"] = pwm.getDutyCycle();
+    doc["pwm"]["output_ms"] = pwm.getOutput_ms();
+    if (pwm.isPidEnabled() || active || deepState) {
       doc["pid"]["enabled"] = pwm.isPidEnabled();
       doc["pid"]["targetTemp_C"] = pwm.getTargetTemperature_C();
     }
   }
-  if (pwm.isPidEnabled() || pid_current) {
+  if (pwm.isPidEnabled() || pid_current || deepState) {
     double Kp = pwm.getKp(), Ki = pwm.getKi(), Kd = pwm.getKd();
     doc["pid"]["Kp"] = Kp;
     doc["pid"]["Ki"] = Ki;
     doc["pid"]["Kd"] = Kd;
   }
-  if (pwm.isTuning()) {
+  if (pwm.isTuning() || deepState) {
     double tKp = pwm.getTuningKp();
     double tKi = pwm.getTuningKi();
     double tKd = pwm.getTuningKd();
@@ -116,9 +116,13 @@ void QTKilnMQTT::_publish_state(bool active, bool pid_current) {
   if (program.isProgramLoaded()) {
     doc["program"]["name"] = program.getLoadedProgramName();
     doc["program"]["running"] = program.isRunning();
-    doc["program"]["paused"] = program.isPaused();
-    doc["program"]["step"] = program.getCurrentStep();
     doc["program"]["steps"] = program.getCurrentProgramSteps();
+    doc["program"]["step"] = program.getCurrentStep();
+    doc["program"]["paused"] = program.isPaused();
+    doc["program"]["inDwell"] = program.isDwell();
+    doc["program"]["nextStepChangeTime_ms"] = program.getNextStepChangeTime_ms();
+    doc["program"]["stepStartTime_ms"] = program.getStepStartTime_ms();
+    doc["program"]["stepStartTemp_C"] = program.getStepStartTemp_C();
   }
   serializeJson(doc, jsonString);
   snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_STATE);
@@ -127,10 +131,16 @@ void QTKilnMQTT::_publish_state(bool active, bool pid_current) {
 
 void QTKilnMQTT::thread(void) {
   TickType_t xDelay;
+  uint32_t deepStateCounter = 0;
+  bool deepStateUpdate = true;
 
   while (1) {
     if (_enabled) {
-      _publish_state(false, false);
+      if (++deepStateCounter % QTKILN_MQTT_DEEP_STATE_UPDATE_COUNT == 0)
+        deepStateUpdate = true;
+      else
+        deepStateUpdate = false;
+      _publish_state(false, false, deepStateUpdate);
     }
     xDelay = pdMS_TO_TICKS(_updateInterval_ms);
     vTaskDelay(xDelay);

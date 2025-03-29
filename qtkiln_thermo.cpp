@@ -134,7 +134,7 @@ void QTKilnThermo::_doRead(void) {
     int _max31855_read = _max31855->read();
     if (_max31855_read == STATUS_OK) {
       double tmp =_max31855->getTemperature();
-      qtklog.debug(QTKLOG_DBG_PRIO_LOW, "%s max31855 = %g", _name, tmp);
+      qtklog.debug(QTKLOG_DBG_PRIO_LOW*2, "%s max31855 = %g", _name, tmp);
       _lastTemp_C = tmp;
       _lastTime = millis();
     } else {

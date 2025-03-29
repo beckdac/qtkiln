@@ -8,6 +8,7 @@
 #define QTKILN_MQTT_TASK_PRI tskIDLE_PRIORITY + 2
 
 #define QTKILN_MQTT_DEFAULT_UPDATE_INTERVAL_MS 1000
+#define QTKILN_MQTT_DEEP_STATE_UPDATE_COUNT 100
 
 extern "C" void mqttTaskFunction(void *pvParameter);
 
@@ -29,7 +30,7 @@ class QTKilnMQTT
     void setUpdateInterval_ms(uint16_t updateInterval_ms);
 
   private:
-    void _publish_state(bool active, bool pid_current);
+    void _publish_state(bool active, bool pidCurrent, bool deepState);
     uint16_t _updateInterval_ms = 250;	// default update period
     unsigned long _lastTime = 0;	// the last time the system was updated
     bool _enabled = false;		// is the system running

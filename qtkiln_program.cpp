@@ -71,7 +71,7 @@ void QTKilnProgram::thread(void) {
       }
       // running and not paused
       if (!_paused) {
-        qtklog.debug(QTKLOG_DBG_PRIO_LOW, "not paused");
+        qtklog.debug(QTKLOG_DBG_PRIO_LOW, "program %s is running and not paused", _currentProgram->name);
 	      now = millis();
 	      float nowTemp = kiln_thermo->getFilteredTemperature_C();
 	      // check if we need to move to the next step
@@ -139,16 +139,20 @@ void QTKilnProgram::thread(void) {
 	        unsigned long now = millis();
 	        // time since the step start
 	        unsigned long deltaT_ms = now - _stepStartTime_ms;
-	        // temperature change over the transition window for this step
-	        float deltaTemp_C = _currentProgram->step[_currentStep].targetTemperature_C - _stepStartTemp_C;
-	        // degree change in C per millisecond, not data type
-	        float dTms = deltaTemp_C / _currentProgram->step[_currentStep].transitionWindow_ms;
-	        // new temperature from y = mx+b
-	        float newT_C = _stepStartTemp_C + (dTms * deltaT_ms);
-	        qtklog.debug(QTKLOG_DBG_PRIO_LOW, "running program %s changing set point to %g", _currentProgram->name, newT_C);
-	        pwm.setTargetTemperature_C(newT_C);
-	      } else {
-	        // redundant
+          if (deltaT_ms > _currentProgram->step[_currentStep].transitionWindow_ms) {
+            _inDwell = true;
+          } else {
+	          // temperature change over the transition window for this step
+	          float deltaTemp_C = _currentProgram->step[_currentStep].targetTemperature_C - _stepStartTemp_C;
+	          // degree change in C per millisecond, not data type
+	          float dTms = deltaTemp_C / _currentProgram->step[_currentStep].transitionWindow_ms;
+	          // new temperature from y = mx+b
+	          float newT_C = _stepStartTemp_C + (dTms * deltaT_ms);
+	          qtklog.debug(QTKLOG_DBG_PRIO_LOW, "running program %s changing set point to %g", _currentProgram->name, newT_C);
+	          pwm.setTargetTemperature_C(newT_C);
+          }
+	      }
+        if (_inDwell) {
 	        pwm.setTargetTemperature_C(_currentProgram->step[_currentStep].targetTemperature_C);
 	      }
       }
@@ -390,4 +394,20 @@ uint8_t QTKilnProgram::getCurrentProgramSteps(void) {
   if (_currentProgram)
     return _currentProgram->steps;
   return 0;
+}
+
+bool QTKilnProgram::isDwell(void) {
+  return _inDwell;
+}
+
+unsigned long QTKilnProgram::getNextStepChangeTime_ms(void) {
+  return _nextStepChangeTime_ms;
+}
+
+unsigned long QTKilnProgram::getStepStartTime_ms(void) {
+  return _stepStartTime_ms;
+}
+
+uint16_t QTKilnProgram::getStepStartTemp_C(void) {
+  return _stepStartTemp_C;
 }

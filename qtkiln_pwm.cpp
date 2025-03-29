@@ -259,18 +259,26 @@ UBaseType_t QTKilnPWM::getTaskHighWaterMark(void) {
 }
 
 double QTKilnPWM::getKp(void) {
+  if (!_pid)
+    return 0;
   return _pid->GetKp();
 }
 
 double QTKilnPWM::getKi(void) {
+  if (!_pid)
+    return 0;
   return _pid->GetKi();
 }
 
 double QTKilnPWM::getKd(void) {
+  if (!_pid)
+    return 0;
   return _pid->GetKd();
 }
 
 void QTKilnPWM::setTunings(double Kp, double Ki, double Kd) {
+  if (!_pid)
+    return;
   _pid->SetTunings(Kp, Ki, Kd);
 }
 
