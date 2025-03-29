@@ -1,0 +1,1 @@
+{"name":"lowTempTest","steps":5,"step":[{"tgtT_C":30,"deltaT_min":1},{"tgtT_C":50,"deltaT_min":1,"dwell_min":1},{"tgtT_C":30,"AFAP":true,"dwell_min":1},{"tgtT_C":50,"deltaT_min":1,"dwell_min":1},{"tgtT_C":10,"deltaT_min":1}]}
