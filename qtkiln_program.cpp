@@ -142,7 +142,8 @@ void QTKilnProgram::thread(void) {
 	        // time since the step start
 	        unsigned long deltaT_ms = now - _stepStartTime_ms;
           if (deltaT_ms > _currentProgram->step[_currentStep].transitionWindow_ms) {
-            qtklog.debug(QTKLOG_DBG_PRIO_MED, "moving into dwell period for this step (%lu)", _nextStepChangeTime_ms);
+            qtklog.debug(QTKLOG_DBG_PRIO_MED, "moving into dwell period for this step (%lu)", _currentStep);
+	          _nextStepChangeTime_ms = now + _currentProgram->step[_currentStep].dwell_ms;
             _inDwell = true;
           } else {
 	          // temperature change over the transition window for this step
