@@ -151,8 +151,8 @@ void QTKilnThermo::_doRead(void) {
       if (_max31855->noCommunication()) 
         qtklog.warn("%s thermocouple has NO COMMUNICATION", _name);
       _err++;
-      _errno = QTKILN_ERRNO_MAX31855_NOT_DETECTED;
-      qtklog.warn("%s MAX31855 thermocouple not detected", _name);
+      _errno = QTKILN_ERRNO_MAX31855_READ_FAILED;
+      qtklog.warn("%s MAX31855 thermocouple _doRead failed", _name);
       return;
     }
   } else {
@@ -161,6 +161,9 @@ void QTKilnThermo::_doRead(void) {
     qtklog.warn("no thermocouple object available");
     return;
   }
+#define QTKILN_THERMO_TEMP_FAIL_CUTOFF .1
+  if (_lastTemp_C < QTKILN_THERMO_TEMP_FAIL_CUTOFF)
+    qtllog.warn("very low temperature detected");
   _filter(_lastTemp_C);
 }
 
