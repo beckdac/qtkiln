@@ -18,6 +18,7 @@ extern QTKilnThermo *housing_thermo;
 
 extern QTKilnPWM pwm;
 extern QTKilnProgram program;
+extern QTKilnMQTT mqtt;
 
 // use a static function to be the entry point for the task
 void mqttTaskFunction(void *pvParameter) {
