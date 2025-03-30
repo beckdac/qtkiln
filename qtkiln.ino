@@ -287,19 +287,19 @@ void setup() {
   housing_thermo->enable();
 
   // lcd setup
-  //lcd_update(kiln_thermo->getFilteredTemperature_C(), false, false);
+  //lcdUpdate(kiln_thermo->getFilteredTemperature_C(), false, false);
 
   // turn this on at the end
   mqtt.enable();
 }
 
-void lcd_update(float temp, bool bold, bool colon) {
+void lcdUpdate(float temp, bool bold, bool colon) {
   // 0.5 is for rounding up
   uint16_t val = temp + 0.5;
 
   if (temp < 0) {
     val = 0;
-    qtklog.warn("negative temperature sent to lcd_update, set to 0");
+    qtklog.warn("negative temperature sent to lcdUpdate, set to 0");
   } else if (temp > 9999) {
     val = 9999;
     qtklog.warn("max temperature reached, is everything OK");
@@ -500,7 +500,7 @@ void loop() {
       alarm_on();
     }
 
-    lcd_update(kiln_thermo->getFilteredTemperature_C(), ssr_state, ssr_state);
+    lcdUpdate(kiln_thermo->getFilteredTemperature_C(), ssr_state, ssr_state);
     // run handlers for subprocesses 
     mqttCli->loop();
 

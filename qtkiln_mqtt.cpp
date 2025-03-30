@@ -124,6 +124,25 @@ void QTKilnMQTT::_publish_state(bool active, bool pid_current, bool deepState) {
     doc["program"]["stepStartTime_ms"] = program.getStepStartTime_ms();
     doc["program"]["stepStartTemp_C"] = program.getStepStartTemp_C();
   }
+  if (deepState) {
+    multi_heap_info_t info;
+
+    heap_caps_get_info(&info, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT); // internal RAM, memory capable to store data or to create new task
+    doc["mem"]["totalFree"] =  info.total_free_bytes;   // total currently free in all non-continues blocks
+    doc["mem"]["minFree"] = info.minimum_free_bytes;  // minimum free ever
+    doc["mem"]["largestFreeBlock"] = info.largest_free_block;   // largest continues block to allocate big array
+    doc["mem"]["kilnThermo"]["highWaterMark"] = kiln_thermo->getTaskHighWaterMark();
+    doc["mem"]["housingThermo"]["highWaterMark"] = housing_thermo->getTaskHighWaterMark();
+    doc["mem"]["program"]["highWaterMark"] = program.getTaskHighWaterMark();
+    doc["mem"]["pwm"]["highWaterMark"] = pwm.getTaskHighWaterMark();
+    doc["mem"]["mqtt"]["highWaterMark"] = mqtt.getTaskHighWaterMark();
+    doc["info"]["debugPriorityCutoff"] = qtklog.getDebugPriorityCutoff();
+    doc["info"]["reallocationCount"] = qtklog.getReallocationCount();
+    doc["info"]["kilnErrorCount"] = kiln_thermo->getErrorCount();
+    doc["info"]["housingErrorCount"] = housing_thermo->getErrorCount();
+    doc["wifi"]["RSSI_dBm"] = WiFi.RSSI();
+    doc["wifi"]["ip"] = WiFi.localIP().toString().c_str();
+  }
   serializeJson(doc, jsonString);
   snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_STATE);
   _mqttCli->publish(buf1, jsonString);
@@ -135,6 +154,9 @@ void QTKilnMQTT::thread(void) {
   bool deepStateUpdate = true;
 
   while (1) {
+#if 0
+    continue;
+#endif
     if (_enabled) {
       if (++deepStateCounter % QTKILN_MQTT_DEEP_STATE_UPDATE_COUNT == 0)
         deepStateUpdate = true;

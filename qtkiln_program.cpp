@@ -17,6 +17,8 @@ extern QTKilnThermo *kiln_thermo, *housing_thermo;
 void programTaskFunction(void *pvParameter) {
   QTKilnProgram *program = static_cast<QTKilnProgram *>(pvParameter);
 
+  qtklog.debug(0,"hi from program");
+  delay(10);
   program->thread();
 }
 
@@ -57,6 +59,9 @@ void QTKilnProgram::thread(void) {
   unsigned int now;
 
   while (1) {
+#if 0
+    continue;
+#endif
     if (_currentProgram)
       qtklog.debug(QTKLOG_DBG_PRIO_LOW, "thread called at %d with _running set to %d and program %s loaded", millis(), _running, _currentProgram->name);
     if (_running) {

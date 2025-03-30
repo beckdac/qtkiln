@@ -34,6 +34,10 @@ QTKilnPWM::QTKilnPWM(uint16_t windowSize_ms) {
 
 void QTKilnPWM::setWindowSize_ms(uint16_t windowSize_ms) {
   _windowSize_ms = windowSize_ms;
+  if (!_pid) {
+    qtklog.warn("setWindowSize_ms called with no _pid object available at time %lu ms", millis());
+    return;
+  }
   _pid->SetOutputLimits(0, _windowSize_ms);
   _pid->SetSampleTimeUs(_windowSize_ms * 1000);
   qtklog.debug(0, "pwm update interval modified to %d ms", _windowSize_ms);
@@ -45,6 +49,7 @@ uint16_t QTKilnPWM::getWindowSize_ms(void) {
 
 void QTKilnPWM::begin(void) {
   qtklog.print("intializing new pid/pwm with window size %d", _windowSize_ms);
+  delay(10);
   _pid = new QuickPID(&_input, &_output, &_setpoint_flt_C, config.Kp, config.Ki, config.Kd, 
 		  QuickPID::pMode::pOnError, QuickPID::dMode::dOnMeas, QuickPID::iAwMode::iAwClamp,
 		  QuickPID::Action::direct);
@@ -93,12 +98,14 @@ bool QTKilnPWM::isPwmEnabled(void) {
 void QTKilnPWM::setPidMode(QuickPID::Control mode) {
   if (_pid)
     _pid->SetMode(mode);
+  else
+    qtklog.warn("setPidMode called but no pid object available at time %lu ms", millis());
 }
 
 // PID
 void QTKilnPWM::enablePid(bool resetTunings) {
   if (!_pid) {
-    qtklog.warn("unable to enable empty pid object!");
+    qtklog.warn("enablePid called but no pid object available at time %lu ms", millis());
     return;
   }
   // turn on the pwm engine
@@ -117,7 +124,10 @@ void QTKilnPWM::enablePid(bool resetTunings) {
 
 void QTKilnPWM::disablePid(void) {
   qtklog.debug(QTKLOG_DBG_PRIO_HIGH, "PID is being disabled");
-  _pid->SetMode(QuickPID::Control::manual);
+  if (!_pid)
+    qtklog.warn("enablePid called but no pid object available at time %lu ms", millis());
+  else
+    _pid->SetMode(QuickPID::Control::manual);
   _pidEnabled = false;
 }
 
@@ -132,6 +142,8 @@ void QTKilnPWM::pidReset(void) {
   }
   if (_pid)
     _pid->Reset();
+  else
+    qtklog.warn("pidReset called but no pid object available at time %lu ms", millis());
 }
 
 uint16_t QTKilnPWM::getTargetTemperature_C() {
@@ -181,6 +193,9 @@ void QTKilnPWM::thread(void) {
   unsigned long now;
 
   while (1) {
+#if 0
+    continue;
+#endif
     if (_pwmEnabled) {
       if (kiln_thermo && _pidEnabled)
         _input = kiln_thermo->getFilteredTemperature_C();

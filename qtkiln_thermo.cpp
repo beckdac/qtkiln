@@ -139,20 +139,20 @@ void QTKilnThermo::_doRead(void) {
       _lastTime = millis();
     } else {
       if (_max31855->shortToGND())
-        qtklog.warn("%s thermocouple has SHORT TO GROUND");
+        qtklog.warn("%s thermocouple has SHORT TO GROUND", _name);
       if (_max31855->shortToVCC())
-        qtklog.warn("%s thermocouple has SHORT TO VCC");
+        qtklog.warn("%s thermocouple has SHORT TO VCC", _name);
       if (_max31855->openCircuit())  
-        qtklog.warn("%s thermocouple has OPEN CIRCUIT");
+        qtklog.warn("%s thermocouple has OPEN CIRCUIT", _name);
       if (_max31855->genericError()) 
-        qtklog.warn("%s thermocouple has GENERIC ERROR");
+        qtklog.warn("%s thermocouple has GENERIC ERROR", _name);
       if (_max31855->noRead())       
-        qtklog.warn("%s thermocouple has NO READ");
+        qtklog.warn("%s thermocouple has NO READ", _name);
       if (_max31855->noCommunication()) 
-        qtklog.warn("%s thermocouple has NO COMMUNICATION");
+        qtklog.warn("%s thermocouple has NO COMMUNICATION", _name);
       _err++;
       _errno = QTKILN_ERRNO_MAX31855_NOT_DETECTED;
-      qtklog.warn("MAX31855 thermocouple not detected");
+      qtklog.warn("%s MAX31855 thermocouple not detected", _name);
       return;
     }
   } else {
