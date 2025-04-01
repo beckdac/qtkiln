@@ -269,16 +269,18 @@ void setup() {
   // setup SPI
   vSPI->begin();
   //
+//#define MAX31855_SPI_SPEED 16000000
+#define MAX31855_SPI_SPEED 4000000
   // kiln phy
   kiln_MAX31855.begin(); 
-  kiln_MAX31855.setSPIspeed(16000000);
+  kiln_MAX31855.setSPIspeed(MAX31855_SPI_SPEED);
   // kiln process
   kiln_thermo = new QTKilnThermo(config.kiln.updateInterval_ms, &kiln_MAX31855, "kiln");
   kiln_thermo->begin();
   //
   // housing phy
   housing_MAX31855.begin();
-  housing_MAX31855.setSPIspeed(16000000);
+  housing_MAX31855.setSPIspeed(MAX31855_SPI_SPEED);
   // housing process
   housing_thermo = new QTKilnThermo(config.housing.updateInterval_ms, &housing_MAX31855, "housing");
   housing_thermo->begin();
