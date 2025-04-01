@@ -163,7 +163,7 @@ void QTKilnThermo::_doRead(void) {
   }
 #define QTKILN_THERMO_TEMP_FAIL_CUTOFF .1
   if (_lastTemp_C < QTKILN_THERMO_TEMP_FAIL_CUTOFF)
-    qtllog.warn("very low temperature detected");
+    qtklog.warn("very low temperature detected");
   _filter(_lastTemp_C);
 }
 

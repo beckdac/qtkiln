@@ -96,6 +96,7 @@ void configLoad(const String &jsonString, bool justThermos=false) {
     config_setPidInitialKd(doc[PREFS_PID_KD] | config.Kd);
     config_setTimezone(doc[PREFS_TIMEZONE] | config.timezone);
     config_setDebugPriority(doc[PREFS_DBG_PRIORITY] | config.debugPriority);
+    config_setMaxThermoErrors(doc[PREFS_MAX_THERMO_ERRORS] | config.maxThermoErrors);
   }
   // we can only set these after they are configured 
   // so check if they are allocated before setting these
@@ -133,6 +134,7 @@ String configSerialize(void) {
   doc[PREFS_PGM_UPD_INT_MS] = config.programUpdateInterval_ms;
   doc[PREFS_MQTT_UPD_INT_MS] = config.mqttUpdateInterval_ms;
   doc[PREFS_MQTT_ENABLE_DBG] = config.mqttEnableDebugMessages;
+  doc[PREFS_MAX_THERMO_ERRORS] = config.maxThermoErrors;
   doc[PREFS_PID_KP] = config.Kp;
   doc[PREFS_PID_KI] = config.Ki;
   doc[PREFS_PID_KD] = config.Kd;
@@ -332,6 +334,7 @@ void mqtt_publish_statistics(void) {
   doc["pwm"]["highWaterMark"] = pwm.getTaskHighWaterMark();
   doc["mqtt"]["highWaterMark"] = mqtt.getTaskHighWaterMark();
   doc["state"]["debugPriorityCutoff"] = qtklog.getDebugPriorityCutoff();
+  doc["state"]["maxThermoErrors"] = config.maxThermoErrors;
   doc["statistics"]["reallocationCount"] = qtklog.getReallocationCount();
   doc["statistics"]["kilnErrorCount"] = kiln_thermo->getErrorCount();
   doc["statistics"]["housingErrorCount"] = housing_thermo->getErrorCount();
@@ -463,6 +466,7 @@ void loop() {
   TickType_t xDelay;
   bool kiln_alarm_temp = false, housing_alarm_temp = false;
   bool kiln_eshut_temp = false, housing_eshut_temp = false;
+  bool eshut_thermo_error = false;
 
 #define QTKILN_MAIN_LOOP_STARTUP_DELAY 1000
   xDelay = pdMS_TO_TICKS(QTKILN_MAIN_LOOP_STARTUP_DELAY);
@@ -471,6 +475,7 @@ void loop() {
   while (1) {
     float kiln_temp_C = kiln_thermo->getFilteredTemperature_C();
     float housing_temp_C = housing_thermo->getFilteredTemperature_C();
+
     if (kiln_temp_C > EMERGENCY_SHUTDOWN_TEMP_C) {
       qtklog.warn("SHUTDOWN! at %d ms the shutdown temperature of %d was surpassed %g", millis(), EMERGENCY_SHUTDOWN_TEMP_C, kiln_temp_C);
       kiln_eshut_temp = true;
@@ -489,7 +494,15 @@ void loop() {
         housing_alarm_temp = true;
       }
     }
-    if (kiln_eshut_temp || housing_eshut_temp) {
+    if (kiln_thermo->getErrorCount() > config.maxThermoErrors) {
+      qtklog.warn("ALARM! kiln thermocouple error count %d exceed maximum safe value %d", kiln_thermo->getErrorCount(), config.maxThermoErrors);
+      eshut_thermo_error = true;
+    }
+    if (housing_thermo->getErrorCount() > config.maxThermoErrors) {
+      qtklog.warn("ALARM! housing thermocouple error count %d exceed maximum safe value of %d", housing_thermo->getErrorCount(), config.maxThermoErrors);
+      eshut_thermo_error = true;
+    }
+    if (kiln_eshut_temp || housing_eshut_temp || eshut_thermo_error) {
       qtklog.warn("SHUTDOWN! at %d ms of the ssr, pwm, program and turn on the alarm", millis());
       alarm_on();
       ssr_off();
@@ -677,6 +690,10 @@ void config_setPidInitialKd(double Kd) {
 }
 void config_setDebugPriority(uint16_t debugPriority) {
   qtklog.setDebugPriorityCutoff(debugPriority);
+}
+void config_setMaxThermoErrors(uint16_t maxThermoErrors) {
+  config.maxThermoErrors = maxThermoErrors;
+  qtklog.print("maximum thermocouple errors before alarm changed to %d", config.maxThermoErrors);
 }
 void config_setTimezone(const char *timezone) {
   time_t now;

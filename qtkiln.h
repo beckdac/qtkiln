@@ -36,6 +36,7 @@ void ssr_off(void);
 #define MAX_CFG_STR 64
 #define MAC_DEFAULT "c0:ff:ee:ca:fe:42"
 #define HOSTNAME_DEFAULT "qtkiln_coffeecafe42"
+#define MAX_THERMO_ERRORS 20
 struct Config {
   char wifiSsid[MAX_CFG_STR] = WIFI_SSID;
   char wifiPassword[MAX_CFG_STR] = WIFI_PASS;
@@ -59,6 +60,7 @@ struct Config {
     float filterCutoffFrequency_Hz = 1.;
   } kiln, housing;
   bool alarmOnSSR = false;			// should the alarm sound when the SSR is on, mostly for testing
+  uint16_t maxThermoErrors = MAX_THERMO_ERRORS;
   struct HomeAssistantConfig {
     bool enabled = true;
     char configTopicFmt[MAX_CFG_STR] = "homeassistant/%s/%s_%s/config";
@@ -79,7 +81,10 @@ struct Config {
 #define TARGET_TEMP_MIN_C 0
 #define TARGET_TEMP_MAX_C 1000
 #define ALARM_TEMP_C 900
-#define EMERGENCY_SHUTDOWN_TEMP_C 1100
+//production
+//#define EMERGENCY_SHUTDOWN_TEMP_C 1100
+//testing
+#define EMERGENCY_SHUTDOWN_TEMP_C 950
 #define ALARM_HOUSING_TEMP_C 60
 #define EMERGENCY_HOUSING_SHUTDOWN_TEMP_C 80
 
@@ -125,6 +130,7 @@ struct Config {
 #define PREFS_MQTT_UPD_INT_MS "mqttUpdateInterval_ms"
 #define PREFS_MQTT_ENABLE_DBG "mqttEnableDebugMessages"
 #define PREFS_PGM_UPD_INT_MS "programUpdateInterval_ms"
+#define PREFS_MAX_THERMO_ERRORS "maxThermoErrors"
 
 // timings
 #define WIFI_SETUP_DELAY_MS 250
