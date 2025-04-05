@@ -15,6 +15,7 @@ void config_setPidInitialKd(double Kd);
 void config_setPidInitialKp(double Kp);
 void config_setTimezone(const char *timeZone);
 void config_setHostname(const char *hostname);
+void config_setHomeAssistantEnabled(bool homeAssEnabled);
 void onConnectionEstablished(void);
 void onConfigMessageReceived(const String &message);
 void onStateSetMessageReceived(const String &message);
@@ -27,9 +28,9 @@ void ssr_off(void);
 #define MAX_BUF 256
 
 // default initial PID params
-#define PID_KP 8.0
-#define PID_KI 0.1
-#define PID_KD 0.05
+#define PID_KP 20.0
+#define PID_KI 0.01
+#define PID_KD 200. 
 
 #define QTKILN_TASK_CORE 1
 // config structure used by all the modules
@@ -50,7 +51,7 @@ struct Config {
   char timezone[MAX_CFG_STR] = "PST8PDT,M3.2.0,M11.1.0";  // https://github.com/nayarsystems/posix_tz_db/blob/master/zones.csv
   uint16_t debugPriority = 0;
   uint16_t pwmWindow_ms = 5000;
-  uint16_t mqttUpdateInterval_ms = 1000;
+  uint16_t mqttUpdateInterval_ms = 5000;
   uint16_t programUpdateInterval_ms = 1000;
   bool mqttEnableDebugMessages = false;
   uint8_t mainLoop_ms = 5;
@@ -63,7 +64,7 @@ struct Config {
   uint16_t maxThermoErrors = MAX_THERMO_ERRORS;
   struct HomeAssistantConfig {
     bool enabled = true;
-    char configTopicFmt[MAX_CFG_STR] = "homeassistant/%s/%s_%s/config";
+    char configTopicFmt[MAX_CFG_STR] = "homeassistant/%s/%s/config";
     char deviceIdFmt[MAX_CFG_STR] = "qtkiln_%s";
     char deviceNameFmt[MAX_CFG_STR] = "qtkiln_%s";
     char componentFmt[MAX_CFG_STR] = "qtkiln_%s_cmp_%s";
@@ -92,6 +93,13 @@ struct Config {
 #define MQTT_TOPIC_FMT "%s/%s"
 #define MQTT_TOPIC_BASE "qtkiln"
 #define MQTT_TOPIC_STATE "state"
+#define MQTT_TOPIC_HA_STATE "ha_state"
+#define MQTT_TOPIC_HA_PWM "ha_pwm"
+#define MQTT_TOPIC_HA_PID "ha_pid"
+#define MQTT_TOPIC_HA_PROGRAM "ha_program"
+#define MQTT_TOPIC_HA_MEM "ha_mem"
+#define MQTT_TOPIC_HA_INFO "ha_info"
+#define MQTT_TOPIC_HA_WIFI "ha_wifi"
 #define MQTT_TOPIC_CONFIG "config"
 #define MQTT_TOPIC_PROGRAM "program"
 #define MQTT_TOPIC_SET "set"
@@ -129,6 +137,7 @@ struct Config {
 #define PREFS_PWM_WINDOW_MS "PWMWindow_ms"
 #define PREFS_MQTT_UPD_INT_MS "mqttUpdateInterval_ms"
 #define PREFS_MQTT_ENABLE_DBG "mqttEnableDebugMessages"
+#define PREFS_HA_ENABLED "homeAssistantEnabled"
 #define PREFS_PGM_UPD_INT_MS "programUpdateInterval_ms"
 #define PREFS_MAX_THERMO_ERRORS "maxThermoErrors"
 

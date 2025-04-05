@@ -28,9 +28,11 @@ class QTKilnMQTT
     UBaseType_t getTaskHighWaterMark(void);
     uint16_t getUpdateInterval_ms(void);
     void setUpdateInterval_ms(uint16_t updateInterval_ms);
+    void homeAssistant_begin(void); // send out the discovery packet
 
   private:
-    void _publish_state(bool active, bool pidCurrent, bool deepState);
+    void _publishState(bool active, bool pidCurrent, bool deepState);
+    void _homeAssistantPublishState(bool active, bool pidCurrent, bool deepState);
     uint16_t _updateInterval_ms = 250;	// default update period
     unsigned long _lastTime = 0;	// the last time the system was updated
     bool _enabled = false;		// is the system running

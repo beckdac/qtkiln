@@ -1,0 +1,1 @@
+{"name":"plaBurnoutv2","steps":4,"step":[{"tgtT_C":100,"deltaT_min":0,"dwell_min":180},{"tgtT_C":550,"deltaT_min":120,"dwell_min":180},{"tgtT_C":760,"deltaT_min":90,"dwell_min":150},{"tgtT_C":5,"deltaT_min":120}]}

@@ -1,4 +1,1 @@
-{
-  "name":"system96_9mm",
-  "steps":5,"step":[{"tgtT_C":540,"deltaT_min":216},{"tgtT_C":800,"deltaT_min":30,"dwell":10},{"tgtT_C":540,"AFAP":true,"dwell":10},{"tgtT_C":513,"deltaT_min":20,"dwell":40},{"tgtT_C":45,"deltaT_min":180}]
-}
+{ "name":"system96_9mm", "steps":5,"step":[{"tgtT_C":540,"deltaT_min":216},{"tgtT_C":800,"deltaT_min":30,"dwell":30},{"tgtT_C":540,"AFAP":true,"dwell":10},{"tgtT_C":513,"deltaT_min":20,"dwell":40},{"tgtT_C":45,"deltaT_min":180}] }

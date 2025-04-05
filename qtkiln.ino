@@ -90,6 +90,7 @@ void configLoad(const String &jsonString, bool justThermos=false) {
     config_setPwmWindow_ms(doc[PREFS_PWM_WINDOW_MS] | config.pwmWindow_ms);
     config_setMqttUpdateInterval_ms(doc[PREFS_MQTT_UPD_INT_MS] | config.mqttUpdateInterval_ms);
     config_setMqttEnableDebugMessages(doc[PREFS_MQTT_ENABLE_DBG] | config.mqttEnableDebugMessages);
+    config_setHomeAssistantEnabled(doc[PREFS_HA_ENABLED] | config.homeAss.enabled);
     config_setProgramUpdateInterval_ms(doc[PREFS_PGM_UPD_INT_MS] | config.programUpdateInterval_ms);
     config_setPidInitialKp(doc[PREFS_PID_KP] | config.Kp);
     config_setPidInitialKi(doc[PREFS_PID_KI] | config.Ki);
@@ -134,6 +135,7 @@ String configSerialize(void) {
   doc[PREFS_PGM_UPD_INT_MS] = config.programUpdateInterval_ms;
   doc[PREFS_MQTT_UPD_INT_MS] = config.mqttUpdateInterval_ms;
   doc[PREFS_MQTT_ENABLE_DBG] = config.mqttEnableDebugMessages;
+  doc[PREFS_HA_ENABLED] = config.homeAss.enabled;
   doc[PREFS_MAX_THERMO_ERRORS] = config.maxThermoErrors;
   doc[PREFS_PID_KP] = config.Kp;
   doc[PREFS_PID_KI] = config.Ki;
@@ -693,6 +695,9 @@ void config_setPidInitialKd(double Kd) {
 void config_setDebugPriority(uint16_t debugPriority) {
   qtklog.setDebugPriorityCutoff(debugPriority);
 }
+void config_setHomeAssistantEnabled(bool homeAssEnabled) {
+  config.homeAss.enabled = homeAssEnabled;
+}
 void config_setMaxThermoErrors(uint16_t maxThermoErrors) {
   config.maxThermoErrors = maxThermoErrors;
   qtklog.print("maximum thermocouple errors before alarm changed to %d", config.maxThermoErrors);
@@ -1005,7 +1010,7 @@ void homeAss_begin(void) {
   doc[buf]["value_template"] = "{{ value_json.housing.temp_C }}";
   snprintf(buf2, MAX_BUF, "%s_t", buf);
   doc[buf]["unique_id"] = buf2;
-  snprintf(buf, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_STATE);
+  snprintf(buf, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_HA_STATE);
   doc["state_topic"] = buf;
   doc["qos"] = 2;
 
@@ -1028,8 +1033,7 @@ void onConnectionEstablished(void) {
   snprintf(topic, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_SET);
   mqttCli->subscribe(topic, onSetStateMessageReceived);
 
-  // send out the home assistant mqtt discovery messages
   if (config.homeAss.enabled) {
-    homeAss_begin();
+    mqtt.homeAssistant_begin();
   }
 }
