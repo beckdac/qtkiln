@@ -110,7 +110,7 @@ void QTKilnMQTT::homeAssistant_begin() {
   doc["cmps"][cmpId]["device_class"] = "temperature";
   doc["cmps"][cmpId]["unit_of_measurement"] = "°C";
   doc["cmps"][cmpId]["value_template"] = "{{ value_json.kiln.temp_C }}";
-  snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_HA_STATE);
+  snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_STATE);
   doc["cmps"][cmpId]["state_topic"] = buf1;
   // housing
   snprintf(cmpId, MAX_BUF, "%s_housing", devId);
@@ -120,18 +120,18 @@ void QTKilnMQTT::homeAssistant_begin() {
   doc["cmps"][cmpId]["device_class"] = "temperature";
   doc["cmps"][cmpId]["unit_of_measurement"] = "°C";
   doc["cmps"][cmpId]["value_template"] = "{{ value_json.housing.temp_C }}";
-  snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_HA_STATE);
+  snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_STATE);
   doc["cmps"][cmpId]["state_topic"] = buf1;
   // pwm output
   snprintf(cmpId, MAX_BUF, "%s_output_ms", devId);
   doc["cmps"][cmpId]["unique_id"] = cmpId;
   doc["cmps"][cmpId]["p"] = "number";
-  doc["cmps"][cmpId]["name"] = "PWM Output (ms)";
+  doc["cmps"][cmpId]["name"] = "PWM Output";
   doc["cmps"][cmpId]["unit_of_measurement"] = "milliseconds";
   doc["cmps"][cmpId]["min"] = 0;
   doc["cmps"][cmpId]["max"] = pwm.getWindowSize_ms();
   doc["cmps"][cmpId]["value_template"] = "{{ value_json.output_ms }}";
-  snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_HA_PWM);
+  snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_PWM);
   doc["cmps"][cmpId]["state_topic"] = buf1;
   doc["cmps"][cmpId]["command_template"] = "{ \"output_ms\":{{ value }} }";
   snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, "set");
@@ -139,15 +139,13 @@ void QTKilnMQTT::homeAssistant_begin() {
   // duty cycle
   snprintf(cmpId, MAX_BUF, "%s_dutyCycle_percent", devId);
   doc["cmps"][cmpId]["unique_id"] = cmpId;
-  doc["cmps"][cmpId]["p"] = "number";
-  doc["cmps"][cmpId]["name"] = "PWM Duty Cycle (%)";
-  doc["cmps"][cmpId]["unit_of_measurement"] = "percent";
+  doc["cmps"][cmpId]["p"] = "sensor";
+  doc["cmps"][cmpId]["name"] = "PWM Duty Cycle";
+  doc["cmps"][cmpId]["device_class"]= "power_factor";
+  doc["cmps"][cmpId]["unit_of_measurement"] = "%";
   doc["cmps"][cmpId]["value_template"] = "{{ value_json.dutyCycle }}";
-  snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_HA_PWM);
+  snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_PWM);
   doc["cmps"][cmpId]["state_topic"] = buf1;
-  //doc["cmps"][cmpId]["command_template"] = "{ \"output_ms\":{{ value }} }";
-  snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, "set");
-  doc["cmps"][cmpId]["command_topic"] = buf1;
   // pwm enabled
   snprintf(cmpId, MAX_BUF, "%s_pwmEnabled", devId);
   doc["cmps"][cmpId]["unique_id"] = cmpId;
@@ -156,7 +154,7 @@ void QTKilnMQTT::homeAssistant_begin() {
   doc["cmps"][cmpId]["payload_on"] = "{ \"pwmEnabled\":true }";
   doc["cmps"][cmpId]["payload_off"] = "{ \"pwmEnabled\":false }";
   doc["cmps"][cmpId]["value_template"] = "{{ value_json.pwmEnabled }}";
-  snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_HA_PWM);
+  snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_PWM);
   doc["cmps"][cmpId]["state_topic"] = buf1;
   snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, "set");
   doc["cmps"][cmpId]["command_topic"] = buf1;
@@ -168,7 +166,7 @@ void QTKilnMQTT::homeAssistant_begin() {
   doc["cmps"][cmpId]["payload_on"] = "{ \"pidEnabled\":true }";
   doc["cmps"][cmpId]["payload_off"] = "{ \"pidEnabled\":false }";
   doc["cmps"][cmpId]["value_template"] = "{{ value_json.pidEnabled }}";
-  snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_HA_PID);
+  snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_PID);
   doc["cmps"][cmpId]["state_topic"] = buf1;
   snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, "set");
   doc["cmps"][cmpId]["command_topic"] = buf1;
@@ -181,23 +179,23 @@ void QTKilnMQTT::homeAssistant_begin() {
   doc["cmps"][cmpId]["min"] = 0;
   doc["cmps"][cmpId]["max"] = TARGET_TEMP_MAX_C;
   doc["cmps"][cmpId]["value_template"] = "{{ value_json.targetTemp_C }}";
-  snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_HA_PID);
+  snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_PID);
   doc["cmps"][cmpId]["state_topic"] = buf1;
   doc["cmps"][cmpId]["command_template"] = "{ \"targetTemp_C\":{{ value }} }";
   snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, "set");
   doc["cmps"][cmpId]["command_topic"] = buf1;
 
   // program
-  //snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_HA_PROGRAM);
+  //snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_PROGRAM);
   //doc["state_topic"] = buf2;
   snprintf(cmpId, MAX_BUF, "%s_programName", devId);
   doc["cmps"][cmpId]["unique_id"] = cmpId;
   doc["cmps"][cmpId]["p"] = "text";
   doc["cmps"][cmpId]["name"] = "Loaded Program";
   doc["cmps"][cmpId]["value_template"] = "{{ value_json.name }}";
-  snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_HA_PROGRAM);
+  snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_CONTROL);
   doc["cmps"][cmpId]["state_topic"] = buf1;
-  doc["cmps"][cmpId]["command_template"] = "{ \"program\":{{ value }} }";
+  doc["cmps"][cmpId]["command_template"] = "{ \"program\":\"{{ value }}\" }";
   snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, "set");
   doc["cmps"][cmpId]["command_topic"] = buf1;
   // running a program
@@ -206,7 +204,7 @@ void QTKilnMQTT::homeAssistant_begin() {
   doc["cmps"][cmpId]["p"] = "switch";
   doc["cmps"][cmpId]["name"] = "Program Running";
   doc["cmps"][cmpId]["value_template"] = "{{ value_json.running }}";
-  snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_HA_PID);
+  snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_CONTROL);
   doc["cmps"][cmpId]["state_topic"] = buf1;
   doc["cmps"][cmpId]["payload_on"] = "{ \"runProgram\":true }";
   doc["cmps"][cmpId]["payload_off"] = "{ \"runProgram\":false }";
@@ -214,58 +212,105 @@ void QTKilnMQTT::homeAssistant_begin() {
   doc["cmps"][cmpId]["command_topic"] = buf1;
 
   // mem
-  //snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_HA_MEM);
-  //doc["state_topic"] = buf2;
+  // parse min free as free memory for simplicity
+  snprintf(cmpId, MAX_BUF, "%s_mem", devId);
+  doc["cmps"][cmpId]["unique_id"] = cmpId;
+  doc["cmps"][cmpId]["p"] = "sensor";
+  doc["cmps"][cmpId]["name"] = "Free Memory";
+  doc["cmps"][cmpId]["device_class"] = "data_size";
+  doc["cmps"][cmpId]["unit_of_measurement"] = "B";
+  doc["cmps"][cmpId]["max"] = "128";
+  doc["cmps"][cmpId]["value_template"] = "{{ value_json.minFree }}";
+  snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_MEM);
+  doc["cmps"][cmpId]["state_topic"] = buf1;
 
   // info
-  //snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_HA_INFO);
-  //doc["state_topic"] = buf2;
-  //doc["cmps"][cmpId][""] = ;
+  // kiln thermo read errors
+  snprintf(cmpId, MAX_BUF, "%s_kiln_errors", devId);
+  doc["cmps"][cmpId]["unique_id"] = cmpId;
+  doc["cmps"][cmpId]["p"] = "sensor";
+  doc["cmps"][cmpId]["name"] = "Kiln Thermocouple Read Errors";
+  //doc["cmps"][cmpId]["device_class"] = "number";
+  doc["cmps"][cmpId]["value_template"] = "{{ value_json.kilnErrorCount }}";
+  snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_INFO);
+  doc["cmps"][cmpId]["state_topic"] = buf1;
+  // housing thermo read errors
+  snprintf(cmpId, MAX_BUF, "%s_housing_errors", devId);
+  doc["cmps"][cmpId]["unique_id"] = cmpId;
+  doc["cmps"][cmpId]["p"] = "sensor";
+  doc["cmps"][cmpId]["name"] = "Housing Thermocouple Read Errors";
+  //doc["cmps"][cmpId]["device_class"] = "number";
+  doc["cmps"][cmpId]["value_template"] = "{{ value_json.housingErrorCount }}";
+  snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_INFO);
+  doc["cmps"][cmpId]["state_topic"] = buf1;
 
   // wifi
-  //snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_HA_WIFI);
-  //doc["state_topic"] = buf2;
+  // rssi
+  snprintf(cmpId, MAX_BUF, "%s_wifiRSSI", devId);
+  doc["cmps"][cmpId]["unique_id"] = cmpId;
+  doc["cmps"][cmpId]["p"] = "sensor";
+  doc["cmps"][cmpId]["name"] = "WiFi Signal Strength (dbm)";
+  doc["cmps"][cmpId]["device_class"] = "signal_strength";
+  doc["cmps"][cmpId]["unit_of_measurement"] = "dBm";
+  doc["cmps"][cmpId]["value_template"] = "{{ value_json.RSSI_dBm }}";
+  snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_WIFI);
+  doc["cmps"][cmpId]["state_topic"] = buf1;
+  // ip
+  snprintf(cmpId, MAX_BUF, "%s_wifiIP", devId);
+  doc["cmps"][cmpId]["unique_id"] = cmpId;
+  doc["cmps"][cmpId]["p"] = "text";
+  doc["cmps"][cmpId]["name"] = "WiFi IP Address";
+  doc["cmps"][cmpId]["value_template"] = "{{ value_json.ip }}";
+  snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_WIFI);
+  doc["cmps"][cmpId]["state_topic"] = buf1;
+  // this is not supported and these messages will be ignored
+  snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, "ignored");
+  doc["cmps"][cmpId]["command_topic"] = buf1;
 
   serializeJson(doc, jsonString);
   snprintf(buf1, MAX_BUF, config.homeAss.configTopicFmt, "device", devId);
   _mqttCli->publish(buf1, jsonString, true);
 }
 
-void QTKilnMQTT::_homeAssistantPublishState(bool active, bool pid_current, bool deepState) {
+void QTKilnMQTT::_publishState(bool active, bool pid_current, bool deepState) {
   JsonDocument doc;
   String jsonString;
 
+  doc["time_ms"] = millis();
   doc["kiln"]["temp_C"] = kiln_thermo->getFilteredTemperature_C();
   doc["housing"]["temp_C"] = housing_thermo->getFilteredTemperature_C();
   serializeJson(doc, jsonString);
-  snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_HA_STATE);
+  snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_STATE);
   _mqttCli->publish(buf1, jsonString);
 
   if (pwm.isPwmEnabled() || active || deepState) {
     doc.clear();
+    doc["time_ms"] = millis();
     doc["pwmEnabled"] = pwm.isPwmEnabled();
     doc["output_ms"] = pwm.getOutput_ms();
     doc["dutyCycle"] = pwm.getDutyCycle();
     serializeJson(doc, jsonString);
-    snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_HA_PWM);
+    snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_PWM);
     _mqttCli->publish(buf1, jsonString);
   }
 
   if (pwm.isPidEnabled() || pid_current || deepState) {
     double Kp = pwm.getKp(), Ki = pwm.getKi(), Kd = pwm.getKd();
     doc.clear();
+    doc["time_ms"] = millis();
     doc["pidEnabled"] = pwm.isPidEnabled();
     doc["targetTemp_C"] = pwm.getTargetTemperature_C();
     doc["Kp"] = Kp;
     doc["Ki"] = Ki;
     doc["Kd"] = Kd;
     serializeJson(doc, jsonString);
-    snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_HA_PID);
+    snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_PID);
     _mqttCli->publish(buf1, jsonString);
   }
 
   if (program.isProgramLoaded()) {
     doc.clear();
+    doc["time_ms"] = millis();
     doc["name"] = program.getLoadedProgramName();
     doc["running"] = program.isRunning();
     doc["steps"] = program.getCurrentProgramSteps();
@@ -276,7 +321,7 @@ void QTKilnMQTT::_homeAssistantPublishState(bool active, bool pid_current, bool 
     doc["stepStartTime_ms"] = program.getStepStartTime_ms();
     doc["stepStartTemp_C"] = program.getStepStartTemp_C();
     serializeJson(doc, jsonString);
-    snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_HA_PROGRAM);
+    snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_CONTROL);
     _mqttCli->publish(buf1, jsonString);
   }
 
@@ -285,6 +330,7 @@ void QTKilnMQTT::_homeAssistantPublishState(bool active, bool pid_current, bool 
 
     heap_caps_get_info(&info, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT); // internal RAM, memory capable to store data or to create new task
     doc.clear();
+    doc["time_ms"] = millis();
     doc["totalFree"] =  info.total_free_bytes;   // total currently free in all non-continues blocks
     doc["minFree"] = info.minimum_free_bytes;  // minimum free ever
     doc["largestFreeBlock"] = info.largest_free_block;   // largest continues block to allocate big array
@@ -294,28 +340,30 @@ void QTKilnMQTT::_homeAssistantPublishState(bool active, bool pid_current, bool 
     doc["pwm"] = pwm.getTaskHighWaterMark();
     doc["mqtt"] = mqtt.getTaskHighWaterMark();
     serializeJson(doc, jsonString);
-    snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_HA_MEM);
+    snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_MEM);
     _mqttCli->publish(buf1, jsonString);
 
     doc.clear();
+    doc["time_ms"] = millis();
     doc["debugPriorityCutoff"] = qtklog.getDebugPriorityCutoff();
     doc["reallocationCount"] = qtklog.getReallocationCount();
     doc["kilnErrorCount"] = kiln_thermo->getErrorCount();
     doc["housingErrorCount"] = housing_thermo->getErrorCount();
     serializeJson(doc, jsonString);
-    snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_HA_INFO);
+    snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_INFO);
     _mqttCli->publish(buf1, jsonString);
 
     doc.clear();
+    doc["time_ms"] = millis();
     doc["RSSI_dBm"] = WiFi.RSSI();
     doc["ip"] = WiFi.localIP().toString().c_str();
     serializeJson(doc, jsonString);
-    snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_HA_WIFI);
+    snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_WIFI);
     _mqttCli->publish(buf1, jsonString);
   }
 }
 
-void QTKilnMQTT::_publishState(bool active, bool pid_current, bool deepState) {
+#if 0
   JsonDocument doc;
   String jsonString;
 
@@ -380,6 +428,7 @@ void QTKilnMQTT::_publishState(bool active, bool pid_current, bool deepState) {
   snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_STATE);
   _mqttCli->publish(buf1, jsonString);
 }
+#endif
 
 void QTKilnMQTT::thread(void) {
   TickType_t xDelay;
@@ -396,8 +445,6 @@ void QTKilnMQTT::thread(void) {
       else
         deepStateUpdate = false;
       _publishState(false, false, deepStateUpdate);
-      if (config.homeAss.enabled)
-        _homeAssistantPublishState(false, false, deepStateUpdate);
     }
     xDelay = pdMS_TO_TICKS(_updateInterval_ms);
     vTaskDelay(xDelay);

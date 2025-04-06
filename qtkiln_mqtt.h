@@ -8,7 +8,7 @@
 #define QTKILN_MQTT_TASK_PRI tskIDLE_PRIORITY + 2
 
 #define QTKILN_MQTT_DEFAULT_UPDATE_INTERVAL_MS 1000
-#define QTKILN_MQTT_DEEP_STATE_UPDATE_COUNT 100
+#define QTKILN_MQTT_DEEP_STATE_UPDATE_COUNT 20
 
 extern "C" void mqttTaskFunction(void *pvParameter);
 
@@ -32,7 +32,6 @@ class QTKilnMQTT
 
   private:
     void _publishState(bool active, bool pidCurrent, bool deepState);
-    void _homeAssistantPublishState(bool active, bool pidCurrent, bool deepState);
     uint16_t _updateInterval_ms = 250;	// default update period
     unsigned long _lastTime = 0;	// the last time the system was updated
     bool _enabled = false;		// is the system running

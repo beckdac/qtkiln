@@ -980,46 +980,6 @@ void onProgramMessageReceived(const String &message) {
   }
 }
 
-// need to remove the strings from this
-void homeAss_begin(void) {
-  JsonDocument doc;
-  String jsonString;
-  char buf[MAX_BUF], buf2[MAX_BUF];
-
-  snprintf(buf, MAX_BUF, config.homeAss.deviceIdFmt, config.mac);
-  doc["dev"]["ids"] = buf;
-  doc["dev"]["name"] = buf;
-  doc["dev"]["mf"] = config.homeAss.manufacturer;
-  doc["dev"]["mdl"] = config.homeAss.model;
-  doc["dev"]["sw"] = config.homeAss.softwareRev;
-  doc["dev"]["hw"] = config.homeAss.hardwareRev;
-  doc["dev"]["sn"] = config.mac;
-  doc["o"]["name"] = config.homeAss.originName;
-  doc["o"]["sw"] = config.homeAss.softwareRev;
-  snprintf(buf, MAX_BUF, config.homeAss.componentFmt, config.mac, "kiln");
-  doc[buf]["p"] = "sensor";
-  doc[buf]["device_class"] = "temperature";
-  doc[buf]["unit_of_measurement"] = "°C";
-  doc[buf]["value_template"] = "{{ value_json.kiln.temp_C }}";
-  snprintf(buf2, MAX_BUF, "%s_t", buf);
-  doc[buf]["unique_id"] = buf2;
-  snprintf(buf, MAX_BUF, config.homeAss.componentFmt, config.mac, "housing");
-  doc[buf]["p"] = "sensor";
-  doc[buf]["device_class"] = "temperature";
-  doc[buf]["unit_of_measurement"] = "°C";
-  doc[buf]["value_template"] = "{{ value_json.housing.temp_C }}";
-  snprintf(buf2, MAX_BUF, "%s_t", buf);
-  doc[buf]["unique_id"] = buf2;
-  snprintf(buf, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_HA_STATE);
-  doc["state_topic"] = buf;
-  doc["qos"] = 2;
-
-  serializeJson(doc, jsonString);
-
-  snprintf(buf1, MAX_BUF, config.homeAss.configTopicFmt, "sensor", "qtkiln", config.mac);
-  mqttCli->publish(buf1, jsonString, true);
-}
-
 // when the connection to the mqtt has completed
 void onConnectionEstablished(void) {
   char topic[MAX_BUF];
