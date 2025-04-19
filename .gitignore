@@ -1,6 +1,7 @@
 wifi_cred.h
 mqtt_cred.h
 cmds.txt
+*.tsv
 
 # Prerequisites
 *.d
