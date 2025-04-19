@@ -80,12 +80,12 @@ struct Config {
 
 // global temperature maxes
 #define TARGET_TEMP_MIN_C 0
-#define TARGET_TEMP_MAX_C 1000
-#define ALARM_TEMP_C 900
+#define TARGET_TEMP_MAX_C 1050
+#define ALARM_TEMP_C 1080
 //production
-//#define EMERGENCY_SHUTDOWN_TEMP_C 1100
+#define EMERGENCY_SHUTDOWN_TEMP_C 1100
 //testing
-#define EMERGENCY_SHUTDOWN_TEMP_C 950
+//#define EMERGENCY_SHUTDOWN_TEMP_C 950
 #define ALARM_HOUSING_TEMP_C 60
 #define EMERGENCY_HOUSING_SHUTDOWN_TEMP_C 80
 
