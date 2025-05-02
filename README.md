@@ -3,6 +3,8 @@ Open source controller for kilns with home assisstant integration
 
 ![Home Assistant Integration Screenshot](homeassistant.png?raw=true "Home Assistant Integration Screenshot")
 
+![Reference PCB Image](pcb/qtkiln/qtkiln.png?raw=true "Reference PCB Image")
+
 
 `wifi_cred.h` should look something like:
 ```
