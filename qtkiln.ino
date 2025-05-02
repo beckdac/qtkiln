@@ -47,6 +47,7 @@ QTKilnMQTT mqtt;
 
 // PWM object
 #define SSR_PIN 25
+#define SSR2_PIN 27
 bool ssr_state = false;
 QTKilnPWM pwm(QTKILN_PWM_DEFAULT_WINDOW_SIZE);
 
@@ -185,6 +186,7 @@ void setup() {
 
   // no matter what this is the firs thing we do
   pinMode(SSR_PIN, OUTPUT);
+  pinMode(SSR2_PIN, OUTPUT);
   // always turn it off incase we are coming back from a reset
   ssr_state=true; // setting this to true causes it to be forced off
   ssr_off();
@@ -454,6 +456,7 @@ void ssr_on(void) {
     alarm_on();
   ssr_state = true;
   digitalWrite(SSR_PIN, LOW);
+  digitalWrite(SSR2_PIN, LOW);
 }
 
 void ssr_off(void) {
@@ -462,6 +465,7 @@ void ssr_off(void) {
       alarm_off();
     ssr_state = false;
     digitalWrite(SSR_PIN, HIGH);
+    digitalWrite(SSR2_PIN, HIGH);
   }
 }
 
