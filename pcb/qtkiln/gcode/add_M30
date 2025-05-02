@@ -1,0 +1,8 @@
+#!/bin/bash
+
+for file in *".nc"
+do
+  echo $file
+  filengc="${file%.*}.ngc"
+  awk '{ print $0 } END { print "M30" }' $file > $filengc
+done
