@@ -293,6 +293,36 @@ bool QTKilnProgram::set(const String &name, const String &program){
   return true;
 }
 
+char **QTKilnProgram::getProgramNames(uint8_t *programCount) {
+  char **programs = NULL;
+  JsonDocument doc;
+  String jsonString;
+
+  preferences.begin(PREFS_NAMESPACE, true);
+  jsonString = preferences.getString(PREFS_PROGRAM_LIST, String("{}"));
+  preferences.end();
+
+  DeserializationError error = deserializeJson(doc, jsonString);
+
+  if (error) {
+    qtklog.warn("unable to deserialize JSON: %s", error.c_str());
+    *programCount = 0;
+    return NULL;
+  }
+
+  JsonArray arr = doc.as<JsonArray>();
+
+  *programCount = 0;
+  for (JsonVariant value : arr) {
+    const char *this_name = value.as<const char *>();
+    int i = *programCount;
+    *programCount = *programCount + 1;
+    programs = (char **)realloc(programs, *programCount * sizeof(char *));
+    programs[i] = strdup(this_name);
+  }
+  return programs;
+}
+
 String QTKilnProgram::getJSON(const char *name) {
   String program;
 

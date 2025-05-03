@@ -61,6 +61,7 @@ class QTKilnProgram
     unsigned long getNextStepChangeTime_ms(void);
     unsigned long getStepStartTime_ms(void);
     uint16_t getStepStartTemp_C();
+    char** getProgramNames(uint8_t*);
 
   private:
     struct QTKilnProgramStruct *_parseProgram(const String &program);

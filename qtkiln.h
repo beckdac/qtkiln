@@ -34,7 +34,7 @@ void ssr_off(void);
 
 #define QTKILN_TASK_CORE 1
 // config structure used by all the modules
-#define MAX_CFG_STR 64
+#define MAX_CFG_STR 96
 #define MAC_DEFAULT "c0:ff:ee:ca:fe:42"
 #define HOSTNAME_DEFAULT "qtkiln_coffeecafe42"
 #define MAX_THERMO_ERRORS 20

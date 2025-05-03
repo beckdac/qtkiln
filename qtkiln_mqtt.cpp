@@ -134,7 +134,7 @@ void QTKilnMQTT::homeAssistant_begin() {
   snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_PWM);
   doc["cmps"][cmpId]["state_topic"] = buf1;
   doc["cmps"][cmpId]["command_template"] = "{ \"output_ms\":{{ value }} }";
-  snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, "set");
+  snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_SET);
   doc["cmps"][cmpId]["command_topic"] = buf1;
   // duty cycle
   snprintf(cmpId, MAX_BUF, "%s_dutyCycle_percent", devId);
@@ -151,24 +151,28 @@ void QTKilnMQTT::homeAssistant_begin() {
   doc["cmps"][cmpId]["unique_id"] = cmpId;
   doc["cmps"][cmpId]["p"] = "switch";
   doc["cmps"][cmpId]["name"] = "PWM Enabled";
-  doc["cmps"][cmpId]["payload_on"] = "{ \"pwmEnabled\":true }";
-  doc["cmps"][cmpId]["payload_off"] = "{ \"pwmEnabled\":false }";
+  //doc["cmps"][cmpId]["payload_on"] = "{ \"pwmEnabled\":true }";
+  //doc["cmps"][cmpId]["payload_off"] = "{ \"pwmEnabled\":false }";
+  doc["cmps"][cmpId]["state_on"] = true;
+  doc["cmps"][cmpId]["state_off"] = false;
   doc["cmps"][cmpId]["value_template"] = "{{ value_json.pwmEnabled }}";
   snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_PWM);
   doc["cmps"][cmpId]["state_topic"] = buf1;
-  snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, "set");
+  snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_SET);
   doc["cmps"][cmpId]["command_topic"] = buf1;
   // pid enabled
   snprintf(cmpId, MAX_BUF, "%s_pidEnabled", devId);
   doc["cmps"][cmpId]["unique_id"] = cmpId;
   doc["cmps"][cmpId]["p"] = "switch";
   doc["cmps"][cmpId]["name"] = "PID Enabled";
-  doc["cmps"][cmpId]["payload_on"] = "{ \"pidEnabled\":true }";
-  doc["cmps"][cmpId]["payload_off"] = "{ \"pidEnabled\":false }";
+  //doc["cmps"][cmpId]["payload_on"] = "{ \"pidEnabled\":true }";
+  //doc["cmps"][cmpId]["payload_off"] = "{ \"pidEnabled\":false }";
+  doc["cmps"][cmpId]["state_on"] = true;
+  doc["cmps"][cmpId]["state_off"] = false;
   doc["cmps"][cmpId]["value_template"] = "{{ value_json.pidEnabled }}";
   snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_PID);
   doc["cmps"][cmpId]["state_topic"] = buf1;
-  snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, "set");
+  snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_SET);
   doc["cmps"][cmpId]["command_topic"] = buf1;
   // pid target temperature
   snprintf(cmpId, MAX_BUF, "%s_targetTemp_C", devId);
@@ -182,7 +186,7 @@ void QTKilnMQTT::homeAssistant_begin() {
   snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_PID);
   doc["cmps"][cmpId]["state_topic"] = buf1;
   doc["cmps"][cmpId]["command_template"] = "{ \"targetTemp_C\":{{ value }} }";
-  snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, "set");
+  snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_SET);
   doc["cmps"][cmpId]["command_topic"] = buf1;
 
   // program
@@ -190,13 +194,20 @@ void QTKilnMQTT::homeAssistant_begin() {
   //doc["state_topic"] = buf2;
   snprintf(cmpId, MAX_BUF, "%s_programName", devId);
   doc["cmps"][cmpId]["unique_id"] = cmpId;
-  doc["cmps"][cmpId]["p"] = "text";
+  doc["cmps"][cmpId]["p"] = "select";
   doc["cmps"][cmpId]["name"] = "Loaded Program";
+  uint8_t program_count;
+  char **programs = program.getProgramNames(&program_count);
+  for (uint8_t i = 0; i < program_count; ++i) {
+    doc["cmps"][cmpId]["options"].add(programs[i]);
+    free(programs[i]);
+  }
+  free(programs);
   doc["cmps"][cmpId]["value_template"] = "{{ value_json.name }}";
   snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_CONTROL);
   doc["cmps"][cmpId]["state_topic"] = buf1;
   doc["cmps"][cmpId]["command_template"] = "{ \"program\":\"{{ value }}\" }";
-  snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, "set");
+  snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_SET);
   doc["cmps"][cmpId]["command_topic"] = buf1;
   // running a program
   snprintf(cmpId, MAX_BUF, "%s_runProgram", devId);
@@ -208,7 +219,7 @@ void QTKilnMQTT::homeAssistant_begin() {
   doc["cmps"][cmpId]["state_topic"] = buf1;
   doc["cmps"][cmpId]["payload_on"] = "{ \"runProgram\":true }";
   doc["cmps"][cmpId]["payload_off"] = "{ \"runProgram\":false }";
-  snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, "set");
+  snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_SET);
   doc["cmps"][cmpId]["command_topic"] = buf1;
 
   // mem
