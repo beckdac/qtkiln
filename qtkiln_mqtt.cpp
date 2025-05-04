@@ -151,8 +151,8 @@ void QTKilnMQTT::homeAssistant_begin() {
   doc["cmps"][cmpId]["unique_id"] = cmpId;
   doc["cmps"][cmpId]["p"] = "switch";
   doc["cmps"][cmpId]["name"] = "PWM Enabled";
-  //doc["cmps"][cmpId]["payload_on"] = "{ \"pwmEnabled\":true }";
-  //doc["cmps"][cmpId]["payload_off"] = "{ \"pwmEnabled\":false }";
+  doc["cmps"][cmpId]["payload_on"] = "{ \"pwmEnabled\":true }";
+  doc["cmps"][cmpId]["payload_off"] = "{ \"pwmEnabled\":false }";
   doc["cmps"][cmpId]["state_on"] = true;
   doc["cmps"][cmpId]["state_off"] = false;
   doc["cmps"][cmpId]["value_template"] = "{{ value_json.pwmEnabled }}";
@@ -165,8 +165,8 @@ void QTKilnMQTT::homeAssistant_begin() {
   doc["cmps"][cmpId]["unique_id"] = cmpId;
   doc["cmps"][cmpId]["p"] = "switch";
   doc["cmps"][cmpId]["name"] = "PID Enabled";
-  //doc["cmps"][cmpId]["payload_on"] = "{ \"pidEnabled\":true }";
-  //doc["cmps"][cmpId]["payload_off"] = "{ \"pidEnabled\":false }";
+  doc["cmps"][cmpId]["payload_on"] = "{ \"pidEnabled\":true }";
+  doc["cmps"][cmpId]["payload_off"] = "{ \"pidEnabled\":false }";
   doc["cmps"][cmpId]["state_on"] = true;
   doc["cmps"][cmpId]["state_off"] = false;
   doc["cmps"][cmpId]["value_template"] = "{{ value_json.pidEnabled }}";
@@ -269,7 +269,7 @@ void QTKilnMQTT::homeAssistant_begin() {
   // ip
   snprintf(cmpId, MAX_BUF, "%s_wifiIP", devId);
   doc["cmps"][cmpId]["unique_id"] = cmpId;
-  doc["cmps"][cmpId]["p"] = "text";
+  doc["cmps"][cmpId]["p"] = "sensor";
   doc["cmps"][cmpId]["name"] = "WiFi IP Address";
   doc["cmps"][cmpId]["value_template"] = "{{ value_json.ip }}";
   snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_WIFI);
