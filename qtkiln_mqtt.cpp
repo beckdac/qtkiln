@@ -215,6 +215,8 @@ void QTKilnMQTT::homeAssistant_begin() {
   doc["cmps"][cmpId]["p"] = "switch";
   doc["cmps"][cmpId]["name"] = "Program Running";
   doc["cmps"][cmpId]["value_template"] = "{{ value_json.running }}";
+  doc["cmps"][cmpId]["state_on"] = true;
+  doc["cmps"][cmpId]["state_off"] = false;
   snprintf(buf1, MAX_BUF, MQTT_TOPIC_FMT, config.topic, MQTT_TOPIC_CONTROL);
   doc["cmps"][cmpId]["state_topic"] = buf1;
   doc["cmps"][cmpId]["payload_on"] = "{ \"runProgram\":true }";
